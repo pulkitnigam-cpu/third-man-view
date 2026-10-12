@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Third Man View Components Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a fixed-scale swimlane board (actors as rows, Trigger→Output as columns) inside a horizontal scroller, with an SVG layer for the dashed flow lines. */
+:root{
+  --bg:#f3f5f2; --board:#ffffff; --ink:#15211b; --muted:#5b6b62; --line:#d5ddd7;
+  --rail:#11281e; --rail-ink:#e9f2ec; --rail-sub:#9fb8aa; --head:#1d3a2c;
+  --data:#2d5f9a; --data-bg:#eef4fb;
+  --proc:#a86a12; --proc-bg:#fdf5e7;
+  --ai:#b3261e; --ai-bg:#fbeceb;
+  --out:#1f7a4d; --out-bg:#e9f6ef;
+  --arrow:#3c4a43;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1511; --board:#121d17; --ink:#e3ece6; --muted:#9db0a5; --line:#25352c;
+  --rail:#0a1a12; --rail-ink:#e3ece6; --rail-sub:#86a294; --head:#173226;
+  --data:#7fb0ea; --data-bg:#14233a; --proc:#e2a64a; --proc-bg:#2a2112;
+  --ai:#f0776e; --ai-bg:#2e1614; --out:#5fcf95; --out-bg:#10291c; --arrow:#9db0a5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1511; --board:#121d17; --ink:#e3ece6; --muted:#9db0a5; --line:#25352c;
+  --rail:#0a1a12; --rail-ink:#e3ece6; --rail-sub:#86a294; --head:#173226;
+  --data:#7fb0ea; --data-bg:#14233a; --proc:#e2a64a; --proc-bg:#2a2112;
+  --ai:#f0776e; --ai-bg:#2e1614; --out:#5fcf95; --out-bg:#10291c; --arrow:#9db0a5; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);margin:0;padding-inline:16px;padding-block:24px 32px}
+header.top{max-width:1530px;margin:0 auto 14px;display:grid;gap:6px}
+h1{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:.01em;margin:0;text-wrap:balance;text-transform:uppercase}
+.sub{font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px}
+.sub a{color:var(--ink);font-family:var(--mono);font-size:12.5px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:14px;border-radius:3px;border:2px solid;display:inline-block}
+.scroller{overflow-x:auto;max-width:1530px;margin:0 auto;border:1px solid var(--line);border-radius:10px;background:var(--board)}
+.board{position:relative;width:1530px;height:924px}
+.rail{position:absolute;left:0;top:0;width:200px;height:100%;background:var(--rail)}
+.colhead{position:absolute;top:0;height:48px;left:200px;right:0;background:var(--head);display:grid;grid-template-columns:repeat(6,220px)}
+.colhead div{color:var(--rail-ink);font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.08em;text-transform:uppercase;display:grid;place-items:center}
+.colhead div small{display:block;font-family:var(--body);font-weight:400;font-size:10.5px;letter-spacing:.02em;text-transform:none;color:var(--rail-sub);margin-top:-6px}
+.actor{position:absolute;left:0;width:200px;height:96px;display:grid;place-content:center;text-align:center;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.actor b{color:var(--rail-ink);font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:.02em}
+.actor small{color:var(--rail-sub);font-size:11.5px;line-height:1.3}
+.lane{position:absolute;left:200px;right:0;height:96px;border-bottom:1px dashed var(--line)}
+.vline{position:absolute;top:48px;bottom:0;width:0;border-left:1px dashed var(--line)}
+.box{position:absolute;width:198px;min-height:72px;border:2px solid;border-radius:8px;padding:7px 9px;font-size:11.6px;line-height:1.35;display:grid;align-content:center;gap:2px;z-index:2}
+.box b{font-weight:600;font-size:12px}
+.box .tag{font-family:var(--mono);font-size:10px;letter-spacing:.02em;opacity:.85}
+.k-data{border-color:var(--data);background:var(--data-bg)}
+.k-proc{border-color:var(--proc);background:var(--proc-bg)}
+.k-ai{border-color:var(--ai);background:var(--ai-bg)}
+.k-out{border-color:var(--out);background:var(--out-bg)}
+.k-user{border-color:var(--ink);background:var(--board)}
+svg.flow{position:absolute;inset:0;width:1530px;height:924px;z-index:1;overflow:visible}
+svg.flow path{fill:none;stroke:var(--arrow);stroke-width:1.6;stroke-dasharray:5 4}
+svg.flow text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.foot{max-width:1530px;margin:12px auto 0;font-size:12.5px;color:var(--muted);line-height:1.5}
+.foot b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Third Man View · Components Map</h1>
+  <div class="sub">
+    <span>Live: <a href="https://third-man-view.vercel.app" target="_blank" rel="noopener">third-man-view.vercel.app</a></span>
+    <span>Code: <a href="https://github.com/pulkitnigam-cpu/third-man-view" target="_blank" rel="noopener">github.com/pulkitnigam-cpu/third-man-view</a></span>
+    <span>Code computes every number · Gemini Flash only writes and explains · Arjun decides what goes out</span>
+  </div>
+  <div class="legend">
+    <span><i style="border-color:var(--data);background:var(--data-bg)"></i>Live / stored data</span>
+    <span><i style="border-color:var(--proc);background:var(--proc-bg)"></i>Rules and statistics (no AI)</span>
+    <span><i style="border-color:var(--ai);background:var(--ai-bg)"></i>Gemini Flash</span>
+    <span><i style="border-color:var(--out);background:var(--out-bg)"></i>What Arjun receives</span>
+  </div>
+</header>
+
+<div class="scroller" role="region" aria-label="Components map, scroll sideways on small screens" tabindex="0">
+<div class="board">
+  <div class="rail"></div>
+  <div class="colhead"><div>Trigger</div><div>Input</div><div>Context</div><div>Processing</div><div>AI</div><div>Output</div></div>
+  <div class="vline" style="left:420px"></div><div class="vline" style="left:640px"></div><div class="vline" style="left:860px"></div><div class="vline" style="left:1080px"></div><div class="vline" style="left:1300px"></div>
+
+  <!-- actors (rows) -->
+  <div class="actor" style="top:48px"><b>Arjun</b><small>Newsletter editor</small></div>
+  <div class="actor" style="top:144px"><b>Third Man View app</b><small>Browser UI + Vercel functions</small></div>
+  <div class="actor" style="top:240px"><b>CricketData.org</b><small>Fixtures &amp; match IDs (API key 1)</small></div>
+  <div class="actor" style="top:336px"><b>Cricbuzz</b><small>via RapidAPI (API key 2)</small></div>
+  <div class="actor" style="top:432px"><b>Cricsheet</b><small>Ball-by-ball archive</small></div>
+  <div class="actor" style="top:528px"><b>Open-Meteo</b><small>Weather, no key</small></div>
+  <div class="actor" style="top:624px"><b>Neon Postgres</b><small>Cache + report history</small></div>
+  <div class="actor" style="top:720px"><b>Gemini Flash</b><small>Writer &amp; researcher (OpenRouter backup)</small></div>
+  <div class="actor" style="top:816px"><b>Telegram</b><small>@Thirdmanviewbot</small></div>
+  <div class="lane" style="top:48px"></div><div class="lane" style="top:144px"></div><div class="lane" style="top:240px"></div><div class="lane" style="top:336px"></div><div class="lane" style="top:432px"></div><div class="lane" style="top:528px"></div><div class="lane" style="top:624px"></div><div class="lane" style="top:720px"></div><div class="lane" style="top:816px"></div>
+
+  <!-- Arjun -->
+  <div class="box k-user" style="left:210px;top:60px"><b>Opens the site, taps to bowl</b>Picks “Write tonight’s newsletter”, Upcoming, Past, or searches a match ID / two teams + format</div>
+  <div class="box k-out" style="left:1310px;top:60px"><b>Reads it on Telegram</b>Pre-match report + newsletter ready to edit and publish; every send kept under “Sent to Arjun”</div>
+
+  <!-- App -->
+  <div class="box k-proc" style="left:430px;top:156px"><b>Resolves the match</b>India’s next fixture, a match ID or a custom pair → venue pinned on the globe</div>
+  <div class="box k-proc" style="left:870px;top:156px"><b>Computes the numbers</b>H2H by format, bat-first v chase, toss, venue trends, win model, form per player, predicted XI rubric</div>
+  <div class="box k-out" style="left:1310px;top:156px"><b>Match dossier on screen</b>Overview · H2H · Venue &amp; pitch · Squads &amp; form · Players · ✦ Write</div>
+
+  <!-- CricketData -->
+  <div class="box k-data" style="left:430px;top:252px"><b>Fixtures &amp; match lookup</b>Current India series, match_info by ID, match squads<span class="tag">100 hits / day</span></div>
+
+  <!-- Cricbuzz -->
+  <div class="box k-data" style="left:430px;top:348px"><b>Schedule &amp; announced squads</b>India schedule (fixtures backup), format-specific series squads with roles</div>
+  <div class="box k-data" style="left:650px;top:348px"><b>Latest form &amp; pitch notes</b>Scorecards since the archive date, venue pitch note, series news stories<span class="tag">200 requests / month</span></div>
+
+  <!-- Cricsheet -->
+  <div class="box k-data" style="left:650px;top:444px"><b>Built match history</b>7,076 internationals since Dec 2001 → team, rivalry, player and venue files</div>
+
+  <!-- Open-Meteo -->
+  <div class="box k-data" style="left:650px;top:540px"><b>Weather</b>Match-day forecast (heat, humidity, rain, dew) + past-match conditions per ground</div>
+
+  <!-- Neon -->
+  <div class="box k-data" style="left:430px;top:636px"><b>Shared cache</b>Stores CricketData, Cricbuzz and pitch answers so the free limits last</div>
+  <div class="box k-out" style="left:1310px;top:636px"><b>Report history</b>Every brief, newsletter and review sent, with time and delivery status</div>
+
+  <!-- Gemini -->
+  <div class="box k-ai" style="left:1090px;top:732px"><b>Writes from the data</b>Google Search for pitch report &amp; team news → structured notes; then the brief, newsletter, reviews, Q&amp;A</div>
+
+  <!-- Telegram -->
+  <div class="box k-out" style="left:1310px;top:828px"><b>Sends to Arjun</b>Bot posts the report automatically after each generation, split into messages</div>
+
+  <svg class="flow" viewBox="0 0 1530 924" aria-hidden="true">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--arrow);stroke:none"/></marker></defs>
+    <!-- Arjun's choice → match resolved -->
+    <path d="M309 132 V144 H500 V156" marker-end="url(#ah)"/>
+    <!-- CricketData → resolve -->
+    <path d="M529 252 V230" marker-end="url(#ah)"/>
+    <!-- Cricbuzz schedule & squads → resolve -->
+    <path d="M430 384 H414 V192 H428" marker-end="url(#ah)"/>
+    <!-- resolve → compute -->
+    <path d="M628 192 H868" marker-end="url(#ah)"/>
+    <!-- Cricbuzz latest form & pitch → compute -->
+    <path d="M749 348 V310 H920 V230" marker-end="url(#ah)"/>
+    <!-- Cricsheet → compute -->
+    <path d="M848 480 H960 V230" marker-end="url(#ah)"/>
+    <!-- Open-Meteo → compute -->
+    <path d="M848 576 H1000 V230" marker-end="url(#ah)"/>
+    <!-- Neon cache sits in front of the live APIs -->
+    <path d="M529 636 V422" marker-end="url(#ah)"/>
+    <text x="536" y="560">cache</text>
+    <!-- compute → dossier -->
+    <path d="M1068 192 H1308" marker-end="url(#ah)"/>
+    <!-- compute → Gemini (numbers + squads + pitch notes as JSON) -->
+    <path d="M1040 228 V262 H1189 V730" marker-end="url(#ah)"/>
+    <text x="1196" y="470">context JSON</text>
+    <!-- Gemini → Telegram -->
+    <path d="M1288 768 H1360 V826" marker-end="url(#ah)"/>
+    <!-- Telegram → Neon history -->
+    <path d="M1450 828 V710" marker-end="url(#ah)"/>
+    <text x="1456" y="790">saved</text>
+    <!-- dossier → Arjun -->
+    <path d="M1409 156 V134" marker-end="url(#ah)"/>
+    <!-- Telegram → Arjun -->
+    <path d="M1508 864 H1522 V96 H1510" marker-end="url(#ah)"/>
+  </svg>
+</div>
+</div>
+
+<p class="foot"><b>Data sources:</b> CricketData.org (fixtures, match IDs) and Cricbuzz on RapidAPI (squads, recent scorecards, pitch notes) are the two keyed cricket APIs; Cricsheet and Open-Meteo are open data. <b>Predicted XI:</b> continuity 30 · form 30 · record 20 · against this opponent 10 · freshness 10, then balance rules (one keeper, at least five bowling options, spin and pace). <b>AI:</b> Gemini Flash only; it works from the computed numbers and searched news and never invents statistics. Search falls back to OpenRouter (Google models only) when the direct allowance runs out. <b>Hosting:</b> Vercel (static site + serverless functions), Neon for cache and history.</p>
+</body>
+</html>
