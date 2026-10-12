@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "third-man-view", "runtimeExecutable": "node", "runtimeArgs": ["scripts/dev.mjs", "5173"], "port": 5173 }
+  ]
+}

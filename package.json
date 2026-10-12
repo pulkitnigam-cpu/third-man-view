@@ -1,0 +1,17 @@
+{
+  "name": "third-man-view",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "dev": "node scripts/dev.mjs 5173"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.4",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0"
+  }
+}

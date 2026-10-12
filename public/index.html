@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Third Man View · Match Radar</title>
+<meta name="description" content="Pre-match cricket intelligence for Third Man View: head-to-head, venue, conditions, player form and an AI brief.">
+<meta name="theme-color" content="#04060c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23c8102e'/%3E%3Cpath d='M9 6.5c5 8 5 19 0 27M31 6.5c-5 8-5 19 0 27' fill='none' stroke='%23f6e7d0' stroke-width='1.6' stroke-dasharray='2 2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preload" href="img/earth.webp" as="image" type="image/webp" crossorigin>
+<link rel="preload" href="data/fixtures.json" as="fetch" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdn.jsdelivr.net/npm/globe.gl@2.34.4/dist/globe.gl.min.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body class="pre">
+
+<div id="intro" role="dialog" aria-label="Welcome">
+  <canvas id="introCanvas" aria-hidden="true"></canvas>
+  <div class="intro-ui" id="introUI">
+    <div class="i-kick" id="iKick">Third Man View</div>
+    <h1 class="i-hello" id="iHello">Welcome</h1>
+    <div class="i-bar"><div class="i-track"><div class="i-fill" id="iFill"></div></div><div class="i-status" id="iStatus" aria-live="polite">Checking today's fixtures</div></div>
+    <div class="i-tap" id="iTap">Tap to bowl</div>
+  </div>
+  <button class="i-skip" id="iSkip">Skip intro</button>
+</div>
+
+<div id="stage"><div id="globe" aria-label="Interactive globe of cricket venues"></div></div>
+
+<header class="top" id="topbar">
+  <button class="logo" id="brandHome" aria-label="Third Man View: start page">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="#c8102e"/><path d="M9 7c5 8 5 18 0 26M31 7c-5 8-5 18 0 26" fill="none" stroke="#f6e7d0" stroke-width="1.6" stroke-dasharray="2 2"/></svg>
+    <span>Third Man View</span>
+  </button>
+  <nav class="nav" aria-label="Main">
+    <button class="nav-link" id="mUp" aria-pressed="true">Upcoming</button>
+    <button class="nav-link" id="mPast" aria-pressed="false">Past matches</button>
+    <button class="nav-link search" id="findBtn" aria-keyshortcuts="/"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Search</span><kbd>/</kbd></button>
+  </nav>
+  <div class="nav-right">
+    <button class="iconbtn sm" id="histBtn" aria-label="Sent to Arjun: history" title="Sent to Arjun">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3 11 14"/><path d="M22 3 15 21l-4-7-7-4z"/></svg>
+    </button>
+    <button class="iconbtn sm" id="clipBtn" aria-pressed="false" aria-label="Use my own sound clip" title="Use my own sound clip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+    </button>
+    <input type="file" id="clipFile" accept="audio/*" hidden>
+    <button class="iconbtn sm" id="sound" aria-pressed="true" aria-label="Sound on match select" title="Sound on match select">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="none"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="none"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+    </button>
+    <button class="cta-news" id="ctaNews" title="Writes the newsletter for India's next match and sends it to Telegram">
+      <span class="star" aria-hidden="true">✦</span>
+      <span class="cta-t"><b>Write tonight's newsletter</b><small id="ctaMatch">Finding India's next match…</small></span>
+    </button>
+  </div>
+</header>
+
+<div class="hint" id="hint">Drag to spin · scroll to zoom · click a venue</div>
+
+<section class="rail" aria-label="Fixtures">
+  <div class="rail-head">
+    <h2>Fixtures</h2>
+    <div class="seg sm" role="group" aria-label="Which fixtures" id="viewSeg">
+      <button id="vIndia" aria-pressed="true" title="Globe on India, India's matches">India</button>
+      <button id="vWorld" aria-pressed="false" title="Whole globe, every fixture">All</button>
+    </div>
+    <span class="sample" id="fxSource">Sample fixtures</span>
+  </div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<div class="chooser" id="chooser" hidden>
+  <div class="ch-in">
+    <div class="ch-kick">Third Man View</div>
+    <h2>Where do you want to start?</h2>
+    <button class="ch-main" data-mode="newsletter">
+      <span class="ch-tag">Recommended</span>
+      <b>Write tonight's newsletter</b>
+      <span id="chMatch">India's next match</span>
+      <small>Squads, pitch, form, head-to-head and predicted XIs, written up and sent to your Telegram. About a minute.</small>
+      <i class="ch-go" aria-hidden="true">→</i>
+    </button>
+    <div class="ch-cards">
+      <button class="ch-card" data-mode="upcoming">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 24h34M24 7c6 6 6 28 0 34M24 7c-6 6-6 28 0 34" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <b>Explore upcoming matches</b>
+        <span>Fixtures on the globe, each with a full dossier.</span>
+      </button>
+      <button class="ch-card" data-mode="past">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 24a14 14 0 1 0 4-9.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 10v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 16v9l6 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <b>Research past matches</b>
+        <span>Scorecards, match reports and reviews since 2001.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<aside class="archive" id="archive" aria-label="Past matches" aria-hidden="true" inert>
+  <div class="d-band" style="background:linear-gradient(90deg,#8fd3ff,#cfd6de)"></div>
+  <div class="ar-top"><div><div class="ch-kick">Archive · every men's international since 2001</div><h2>Past matches</h2></div><button class="close" data-close aria-label="Close past matches"><svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg></button></div>
+  <div class="ar-scroll d-body"></div>
+</aside>
+
+<aside class="dossier" id="dossier" aria-label="Match dossier" aria-hidden="true" tabindex="-1" inert></aside>
+
+<dialog class="finder history" id="history" aria-label="Sent to Arjun">
+  <div class="hi-head"><div><div class="ch-kick">Sent to Arjun on Telegram</div><h2 id="hiTitle">History</h2></div><button class="close" id="hiClose" aria-label="Close history"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="hi-body" id="hiBody"></div>
+</dialog>
+<dialog class="finder" id="finder" aria-label="Find any match">
+  <div class="fd-search">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="fdQ" type="search" placeholder="Team, match or match ID, e.g. Scotland v PNG" autocomplete="off" spellcheck="false" aria-label="Search teams or matches">
+    <button class="fd-close" id="fdClose" aria-label="Close">Esc</button>
+  </div>
+  <div class="fd-body" id="fdBody"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+</body>
+</html>
