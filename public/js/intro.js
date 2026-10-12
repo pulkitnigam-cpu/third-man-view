@@ -42,7 +42,7 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
   const MIN_RED = short ? 0.5 : 3.4; // seconds the welcome screen stays up, at least
   ready.then(() => (loaded = true));
   // safety nets in case animation frames are throttled (background tab, slow device): always move on
-  ready.then(() => setTimeout(() => { if (!bowling) bowl(); }, (MIN_RED + 5) * 1000));
+  ready.then(() => setTimeout(() => { if (!bowling) bowl(); }, (MIN_RED + 14) * 1000));
 
   // audio needs a user gesture: any tap/key during the intro unlocks it, and a tap after loading bowls.
   const unlock = () => { try { getAudio(); } catch {} };
@@ -65,7 +65,9 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
       status.textContent = k < 0.35 ? "Checking today's fixtures" : k < 0.75 ? "Loading head-to-head records" : k < 1 ? "Setting up the globe" : "Ready";
       if (k >= 1 && !tap.classList.contains("on")) {
         tap.classList.add("on");
-        autoTimer = setTimeout(bowl, short ? 0 : 3200); // bowls on its own if nobody taps
+        // the tap unlocks the sound (browsers block audio until the visitor interacts), so wait for it;
+        // bowl silently on its own only if nobody taps for 12 s
+        autoTimer = setTimeout(bowl, 12000);
       }
     } else {
       const t = ((now - t0) / 1000) * SPEED;
