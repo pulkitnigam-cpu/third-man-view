@@ -467,8 +467,12 @@ function teamSplitsTable(d) {
 function squads(d) {
   const A = S.fx.a, B = S.fx.b;
   if (!d.squadA.length && !d.squadB.length) return empty(`No recent ${S.fmt} squads in the data.`);
-  const xiA = new Set(predictXI(d.squadA, S.fmt, { opp: B, teamLast: d.teamAAll.at(-1)?.d }).map((x) => x.p.id)), xiB = new Set(predictXI(d.squadB, S.fmt, { opp: A, teamLast: d.teamBAll.at(-1)?.d }).map((x) => x.p.id));
+  const pa = predictXI(d.squadA, S.fmt, { opp: B, teamLast: d.teamAAll.at(-1)?.d }), pb = predictXI(d.squadB, S.fmt, { opp: A, teamLast: d.teamBAll.at(-1)?.d });
+  const xiA = new Set(pa.map((x) => x.p.id)), xiB = new Set(pb.map((x) => x.p.id));
+  // the predicted XIs up front: eleven names per side, each with its one-line reason
+  const xiList = (side, code, xi) => `<div class="pxi ${side}"><h4 style="color:var(--${side})">${esc(nm(code))}</h4>${xi.length ? `<ol>${xi.map((x) => `<li><b>${esc(x.p.n)}</b> <span class="role">${x.p.role}</span><small>${esc(x.reason)}</small></li>`).join("")}</ol>` : `<p class="muted">Not enough recent ${S.fmt}s to pick an XI.</p>`}</div>`;
   return `
+  ${sec("Predicted XI", { aside: d.announced ? "picked from the announced squads" : "picked from recent squads", body: `<div class="pxi-grid">${xiList("a", A, pa)}${xiList("b", B, pb)}</div>` })}
   <div class="seg sm team-switch" role="group" aria-label="Team"><button data-sq="a" aria-pressed="${S.sqShow === "a"}">${esc(nm(A))}</button><button data-sq="b" aria-pressed="${S.sqShow === "b"}">${esc(nm(B))}</button></div>
   ${S.fresh?.length ? `<p class="note" style="margin:0">Form includes ${S.fresh.length} match${S.fresh.length > 1 ? "es" : ""} since ${dmy(S.meta.built)} from Cricbuzz scorecards: ${S.fresh.map((m) => `${esc(m.desc)} (${dmy(m.d)})`).join(", ")}.</p>` : ""}
   <p class="take">${d.announced ? `<b>Announced squads</b> (${{ backup: "found by Gemini with Google Search", cricbuzz: `Cricbuzz, ${S.fmt} squad`, cricketdata: "CricketData.org, full tour squad" }[S.squadSource] || "announced"}), with our records for each player.` : S.fx.live ? "Loading the announced squads…" : `Players used in each side's last 8 ${S.fmt}s.`} <span class="xi">XI</span> = predicted playing XI. Bars show the last five innings (runs, or wickets for bowlers). Tap a player for details.</p>
