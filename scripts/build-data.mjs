@@ -517,6 +517,7 @@ for (const code of Object.keys(TEAMS)) {
 
 /* ---------------- 7b. full player profiles (everyone who has played for the team since 2018) ---------------- */
 const PROFILE_SINCE = "2018-01-01";
+const LEGEND_IDS = new Set(["d2c2b2d5"]); // Sachin Tendulkar
 function profile(id, list, code) {
   // list: chronological [{m, l}] for one format. Arrays are compact: bat splits [inn, runs, balls, outs], bowl splits [balls, runs, wkts].
   const B = { m: list.length, inn: 0, no: 0, r: 0, b: 0, d: 0, f: 0, s: 0, hs: -1, hsNo: false, c100: 0, c50: 0, z: 0, posSum: 0, how: {}, ph: [[0, 0], [0, 0], [0, 0]], sp: {}, vs: {}, yr: {}, last: [] };
@@ -579,6 +580,10 @@ for (const code of Object.keys(TEAMS)) {
   for (const fmt of ["T20I", "ODI", "Test"]) for (const m of byTeamFmt[code]?.[fmt] || []) {
     if (m.d < PROFILE_SINCE) continue;
     for (const [id, l] of Object.entries(m.lines)) if (l.team === code) ids.set(id, m.d);
+  }
+  // a few retired greats get a profile too, for the player comparison
+  for (const fmt of ["T20I", "ODI", "Test"]) for (const m of byTeamFmt[code]?.[fmt] || []) {
+    for (const [id, l] of Object.entries(m.lines)) if (l.team === code && LEGEND_IDS.has(id) && !(ids.get(id) > m.d)) ids.set(id, m.d);
   }
   PLAYER_SETS[code] = new Set(ids.keys());
   if (!ids.size) continue;

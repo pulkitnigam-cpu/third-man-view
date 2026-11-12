@@ -4,7 +4,7 @@
 // with a switch to the real comparison.
 import { getJSON } from "./data.js";
 import { buildContext, md } from "./brief.js";
-import { RAINA, KOHLI } from "./players.js";
+import { RAINA, KOHLI, SACHIN } from "./players.js";
 
 const FMTS = ["T20I", "ODI", "Test"];
 const ROLE = { BAT: "bat", WK: "wk", AR: "all-r", BOWL: "bowl" };
@@ -17,7 +17,7 @@ async function loadPlayers(S, d) {
   const out = {};
   for (const t of [S.fx.a, S.fx.b]) {
     const j = await getJSON(`data/players/${t}.json`).catch(() => ({ players: [] }));
-    out[t] = j.players.filter((p) => p.id === RAINA || p.id === KOHLI || inSquad.has(p.id) || (p.last || "") >= cutoff).map((p) => ({ ...p, t, sq: inSquad.has(p.id) }));
+    out[t] = j.players.filter((p) => p.id === RAINA || p.id === KOHLI || p.id === SACHIN || inSquad.has(p.id) || (p.last || "") >= cutoff).map((p) => ({ ...p, t, sq: inSquad.has(p.id) }));
   }
   return out;
 }
@@ -59,16 +59,14 @@ export async function comparePanel(body, S, d, h) {
       <select id="cmpB" aria-label="Second player">${options(S.cmp.b)}</select>
     </div>
     <button class="cta" id="cmpGo" ${L && R && L.id !== R.id && !S.cmp.busy ? "" : "disabled"}><span>${S.cmp.busy ? "Comparing…" : L && R ? `Compare ${e(L.n)} v ${e(R.n)}` : "Select two players to compare"}</span><span aria-hidden="true">→</span></button>
-    ${L && R && (L.id === RAINA || R.id === RAINA) ? `<p class="note">House joke is on: with Suresh Raina picked, his numbers are ∞. <button class="linkbtn" id="cmpReal">${S.cmp.real ? "Back to ∞" : "Compare the real numbers instead"}</button></p>` : ""}
     <div id="cmpOut">${out?.joke ? jokeCard(L, R, S.fmt, e) : out ? (out.error ? `<div class="empty">${e(out.error)}</div>` : `<article class="card brief newsletter"><div class="brief-bar"><span class="src-pill ai">Written by ${e(out.model || "Gemini Flash")}</span></div>${md(out.text, e)}${out.sources?.length ? `<p class="note">Sources: ${out.sources.map((s) => `<a href="${e(s.url)}" target="_blank" rel="noopener">${e(s.title || s.url)}</a>`).join(" · ")}</p>` : ""}</article>`) : ""}</div>
   </section>`;
   const onPick = () => { S.cmp.a = body.querySelector("#cmpA").value; S.cmp.b = body.querySelector("#cmpB").value; S.cmp.out = null; comparePanel(body, S, d, h); };
   body.querySelector("#cmpA").onchange = onPick;
   body.querySelector("#cmpB").onchange = onPick;
-  body.querySelector("#cmpReal")?.addEventListener("click", () => { S.cmp.real = !S.cmp.real; S.cmp.out = null; comparePanel(body, S, d, h); });
   body.querySelector("#cmpGo").onclick = async () => {
     if (!L || !R || S.cmp.busy) return;
-    if ((L.id === RAINA || R.id === RAINA) && !S.cmp.real) { S.cmp.out = { joke: true }; return comparePanel(body, S, d, h); }
+    if (L.id === RAINA || R.id === RAINA) { S.cmp.out = { joke: true }; return comparePanel(body, S, d, h); }
     const token = S.token;
     S.cmp.busy = true; comparePanel(body, S, d, h);
     // meetings between the two in the ball-by-ball records, when the pair file has them
@@ -94,12 +92,12 @@ export async function comparePanel(body, S, d, h) {
 // The joke verdict: Raina ∞ on every line, the other player's real figures beside him.
 function jokeCard(L, R, fmt, e) {
   const rainaLeft = L.id === RAINA, other = rainaLeft ? R : L, x = other.f[fmt] || {};
-  const lines = [["Matches", x.m], ["Runs", x.bat?.r], ["Batting average", x.bat?.avg], ["Strike rate", x.bat?.sr], ["Hundreds", x.bat?.c100], ["Wickets", x.bowl?.w]];
-  return `<article class="card brief newsletter"><div class="brief-bar"><span class="src-pill ai">House verdict</span></div>
+  const lines = [["Matches", x.m], ["Runs", x.bat?.r], ["Batting average", x.bat?.avg], ["Strike rate", x.bat?.sr], ["Centuries", x.bat?.c100], ["Wickets", x.bowl?.w], ["IPL titles", null]];
+  return `<article class="card brief newsletter"><div class="brief-bar"><span class="src-pill ai">Verdict</span></div>
     <h3>Suresh Raina v ${e(other.n)}: no contest</h3>
-    <table class="cmp-t"><thead><tr><th class="cv a">Suresh Raina</th><th></th><th class="cv b">${e(other.n)} <small class="muted">(real, ${fmt})</small></th></tr></thead><tbody>
+    <table class="cmp-t"><thead><tr><th class="cv a">Suresh Raina</th><th></th><th class="cv b">${e(other.n)} <small class="muted">(${fmt})</small></th></tr></thead><tbody>
     ${lines.map(([k, v]) => `<tr><td class="cv a win">∞</td><th scope="row">${k}</th><td class="cv b">${v ?? "—"}</td></tr>`).join("")}
     </tbody></table>
-    <p><b>Verdict:</b> Suresh Raina. Mr IPL. Obviously.</p>
-    <p class="note">This is the house joke: Raina's column is ∞, not a statistic. Use "Compare the real numbers instead" for the genuine analysis.</p></article>`;
+    <p><b>Verdict:</b> Suresh Raina, the greatest of all time. Mr IPL. Nobody has ever beaten him.</p>
+    </article>`;
 }

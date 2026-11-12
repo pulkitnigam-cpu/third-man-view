@@ -201,7 +201,7 @@ $("#cards").addEventListener("click", (e) => { const b = e.target.closest(".fx")
 $("#cards").addEventListener("pointerover", (e) => { const b = e.target.closest(".fx"); if (!b) return; const m = fixtures.find((x) => x.id === b.dataset.id); if (m) { getTeam(m.a); getTeam(m.b); getPair(m.a, m.b); } });
 
 /* ---------- select a match ---------- */
-function select(m, { silent = false, autoNews = false } = {}) {
+function select(m, { silent = false, autoNews = false, tab = null } = {}) {
   if (!m) return;
   selected = m; hideHint();
   if (m.a !== "IND" && m.b !== "IND") { view = "world"; filterIndia = false; setPressed("vWorld", true); setPressed("vIndia", false); }
@@ -211,7 +211,7 @@ function select(m, { silent = false, autoNews = false } = {}) {
     world.pointOfView({ lat: m.lat - (narrow ? 22 * alt : 3), lng: m.lng - (narrow ? 0 : 26 * alt), altitude: alt }, reduceMotion ? 0 : 1600);
   }
   refreshPolys(); renderData();
-  openDossier({ fx: m, V: m.V, meta, venues, TEAMS, onClose: clearSelection, autoNews });
+  openDossier({ fx: m, V: m.V, meta, venues, TEAMS, onClose: clearSelection, autoNews, tab });
   if (!silent) trumpet();
   history.replaceState(null, "", m.custom ? `#a=${m.a}&b=${m.b}&f=${m.fmt}${m.venue ? `&v=${m.venue}` : ""}${m.date ? `&d=${m.date}` : ""}` : `#fx=${m.id}`);
 }
@@ -301,7 +301,7 @@ function showChooser() {
   const ch = $("#chooser");
   ch.hidden = false; document.body.classList.add("choosing"); requestAnimationFrame(() => ch.classList.add("on"));
   controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.5; // the globe idles behind the question
-  ch.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => (b.dataset.mode === "newsletter" ? quickNewsletter() : setMode(b.dataset.mode))));
+  ch.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => (b.dataset.mode === "players" ? openPlayerCompare() : setMode(b.dataset.mode))));
   ch.querySelector("[data-mode]").focus();
 }
 function hideChooser() { const ch = $("#chooser"); ch.classList.remove("on"); document.body.classList.remove("choosing"); setTimeout(() => (ch.hidden = true), 450); }
@@ -335,6 +335,15 @@ function nextToWrite() {
   const ahead = fixtures.filter((f) => (f.a === "IND" || f.b === "IND") && (f.status === "soon" || f.status === "upcoming") && !f.custom && !f.sample).sort((x, y) => new Date(x.start) - new Date(y.start));
   return ahead[0] || nextIndiaFixture();
 }
+// Head-to-head player comparison: India's next match, straight to the Players tab (opens on Raina v Kohli)
+function openPlayerCompare() {
+  const m = nextToWrite();
+  if (!m) return toast("No India match to compare players for right now. Use Search to pick one.");
+  hideChooser(); closeArchive();
+  mode = "upcoming"; setPressed("mUp", true); setPressed("mPast", false); document.body.classList.remove("mode-past");
+  deselect();
+  revolveThen(() => { goIndia(1500); setTimeout(() => select(m, { tab: "matchups" }), reduceMotion ? 0 : 1700); });
+}
 function quickNewsletter() {
   const m = nextToWrite();
   if (!m) return toast("No live India fixture right now. Use Search to pick a match.");
@@ -349,7 +358,6 @@ function labelCTA() {
   const label = m ? `${TEAMS[m.a]?.name || m.a} v ${TEAMS[m.b]?.name || m.b} · ${m.fmt} · ${when}` : "No live India fixture · search a match";
   const up = $("#chUpMatch"); if (up) up.textContent = m ? `Next up: ${label}` : "Fixtures on the globe, each with a full dossier.";
   $("#ctaMatch").textContent = label;
-  const ch = $("#chMatch"); if (ch) ch.textContent = m ? `${label}${m.V ? ` · ${m.V.name}` : ""}` : label;
 }
 $("#ctaNews").onclick = quickNewsletter;
 $("#histBtn").onclick = () => import("./history.js").then((m) => m.openHistory());

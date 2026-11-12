@@ -7,7 +7,8 @@ const FMTS = ["T20I", "ODI", "Test"];
 // Kohli is the default pair, and whenever Raina is compared his numbers show as ∞ (clearly a joke, with a switch to the
 // real figures). Only this comparison screen does this; briefs, reports and Telegram never see it.
 export const RAINA = "1dc12ab9", KOHLI = "ba607b88";
-const LEGENDS = new Set([RAINA, KOHLI]);
+export const SACHIN = "d2c2b2d5";
+const LEGENDS = new Set([RAINA, KOHLI, SACHIN]);
 const r1 = (x) => Math.round(x * 10) / 10;
 const sum = (a, b) => (a || 0) + (b || 0);
 const loadPlayers = (code) => getJSON(`data/players/${code}.json`).catch(() => ({ players: [] }));
@@ -77,9 +78,8 @@ export async function renderPlayersTab(body, S, d, h) {
 
 function wire(body, S, d, h) {
   body.onclick = (e) => {
-    const t = e.target.closest("[data-pf],[data-swap],[data-real]");
+    const t = e.target.closest("[data-pf],[data-swap]");
     if (!t) return;
-    if (t.dataset.real != null) S.pp.real = !S.pp.real;
     if (t.dataset.swap != null) [S.pp.a, S.pp.b] = [S.pp.b, S.pp.a];
     if (t.dataset.pf) S.pp.fmt = t.dataset.pf;
     const scroller = body.closest(".d-scroll"), keep = scroller?.scrollTop;
@@ -112,13 +112,13 @@ function view(S, d, h, L, R) {
   return `
   ${pickers}
   <div id="cmpTop"></div>
-  ${joke(L, R) || (L.id === RAINA || R.id === RAINA) ? `<div class="fan-verdict"><b>Fan verdict: Suresh Raina is the greatest.</b> <span>${joke(L, R) && !S.pp.real ? "Joke mode: Raina's numbers are set to ∞." : "These are the real numbers."} <button class="linkbtn" data-real>${S.pp.real ? "Back to ∞" : "Show real numbers"}</button></span></div>` : ""}
+  ${joke(L, R) ? `<div class="fan-verdict"><b>Suresh Raina: the greatest of all time.</b> <span>Mr IPL. Unbeaten, unmatched, unstoppable.</span></div>` : ""}
   ${sec("Comparison", { aside: fmt === "All" ? "all formats" : fmt,
     body: `<div class="seg sm" role="group" aria-label="Format" style="width:max-content">${["T20I", "ODI", "Test", "All"].map((f) => `<button data-pf="${f}" aria-pressed="${fmt === f}" ${f === "All" || L.f[f] || R.f[f] ? "" : 'disabled style="opacity:.35"'}>${f === "All" ? "All formats" : f}</button>`).join("")}</div>
     <div class="pcards">${pcard(L, l, side(L), h, fmt)}${pcard(R, r, side(R), h, fmt)}</div>
-    ${joke(L, R) && !S.pp.real ? infinityTable(S, h, L, R, l, r) : !l && !r ? `<div class="empty">Neither player has played a ${fmt} in the data.</div>` : keyTable(S, h, L, R, l, r)}` })}
+    ${joke(L, R) ? infinityTable(S, h, L, R, l, r) : !l && !r ? `<div class="empty">Neither player has played a ${fmt} in the data.</div>` : keyTable(S, h, L, R, l, r)}` })}
   ${faced(S, h, L, R)}
-  ${(l || r) && !(joke(L, R) && !S.pp.real) ? sec("More detail", { body: detailBlocks(S, h, L, R, l, r, fmt) }) : ""}
+  ${(l || r) && !joke(L, R) ? sec("More detail", { body: detailBlocks(S, h, L, R, l, r, fmt) }) : ""}
   ${note}`;
 }
 
@@ -163,19 +163,19 @@ function pcard(P, x, side, h, fmt) {
 const joke = (L, R) => L.id === RAINA || R.id === RAINA;
 function infinityTable(S, h, L, R, l, r) {
   const e = h.esc, rainaLeft = L.id === RAINA, other = rainaLeft ? r : l;
-  const row = (lab, real, lower = false) => {
-    const inf = lower ? "0.00" : "∞", val = real ?? "—";
+  const row = (lab, real, lower = false, mine) => {
+    const inf = mine ?? (lower ? "0.00" : "∞"), val = real ?? "—";
     const [a, b] = rainaLeft ? [inf, val] : [val, inf];
     return `<tr><td class="cv a${rainaLeft ? " win" : ""}">${a}</td><th scope="row">${lab}</th><td class="cv b${rainaLeft ? "" : " win"}">${b}</td></tr>`;
   };
   const rows = [
     row("Matches", other?.m), `<tr class="sub"><td></td><th>Batting</th><td></td></tr>`,
     row("Runs", other?.bat?.r), row("Average", other?.bat?.avg), row("Strike rate", other?.bat?.sr),
-    row("100s", other?.bat?.c100), row("Sixes", other?.bat?.s), `<tr class="sub"><td></td><th>Bowling</th><td></td></tr>`,
-    row("Wickets", other?.bowl?.w), row("Economy", other?.bowl?.econ, true), row("Catches", null),
+    row("Centuries", other?.bat?.c100), row("Sixes", other?.bat?.s), `<tr class="sub"><td></td><th>Bowling</th><td></td></tr>`,
+    row("Wickets", other?.bowl?.w), row("Economy", other?.bowl?.econ, true), row("IPL titles", null), row("Greatest of all time", "No", false, "Yes"),
   ];
   return `<div class="card"><table class="cmp-t"><thead><tr><th class="cv a" style="color:${h.col(L.t)}">${e(L.n)}</th><th></th><th class="cv b" style="color:${h.col(R.t)}">${e(R.n)}</th></tr></thead><tbody>${rows.join("")}</tbody></table>
-    <p class="note">Raina's column is the house joke (∞ everywhere, economy 0.00). The other column is real. Tap "Show real numbers" for the genuine comparison.</p></div>`;
+    <p class="note">Suresh Raina wins every line.</p></div>`;
 }
 
 /* ---------- key numbers: only what matters for these two roles ---------- */
