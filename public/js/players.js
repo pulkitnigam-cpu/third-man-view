@@ -3,9 +3,11 @@
 import { getJSON } from "./data.js";
 
 const FMTS = ["T20I", "ODI", "Test"];
-// House favourite: Suresh Raina (Cricsheet id) stays in India's list although retired, and gets a fan banner.
-// The banner is a joke on top of the real numbers; it never changes them.
-const RAINA = "1dc12ab9";
+// House joke: Suresh Raina and Virat Kohli (Cricsheet ids) stay in India's list as "Legends" although retired, Raina v
+// Kohli is the default pair, and whenever Raina is compared his numbers show as ∞ (clearly a joke, with a switch to the
+// real figures). Only this comparison screen does this; briefs, reports and Telegram never see it.
+export const RAINA = "1dc12ab9", KOHLI = "ba607b88";
+const LEGENDS = new Set([RAINA, KOHLI]);
 const r1 = (x) => Math.round(x * 10) / 10;
 const sum = (a, b) => (a || 0) + (b || 0);
 const loadPlayers = (code) => getJSON(`data/players/${code}.json`).catch(() => ({ players: [] }));
@@ -60,12 +62,13 @@ export async function renderPlayersTab(body, S, d, h) {
     const built = new Date((S.meta?.built || new Date().toISOString().slice(0, 10)) + "T00:00:00Z");
     const cutoff = new Date(Date.UTC(built.getUTCFullYear(), built.getUTCMonth() - 18, built.getUTCDate())).toISOString().slice(0, 10);
     const inSquad = new Set([...(d.squadA || []), ...(d.squadB || [])].map((p) => p.id));
-    const current = (p) => p.id === RAINA || inSquad.has(p.id) || (p.last || "") >= cutoff;
+    const current = (p) => LEGENDS.has(p.id) || inSquad.has(p.id) || (p.last || "") >= cutoff;
     S.PL = { [A]: pa.players.filter(current).map((p) => ({ ...p, t: A, sq: inSquad.has(p.id) })), [B]: pb.players.filter(current).map((p) => ({ ...p, t: B, sq: inSquad.has(p.id) })) };
     if (S.tab !== "matchups") return;
   }
   const all = [...S.PL[A], ...S.PL[B]];
   const find = (id) => all.find((p) => p.id === id);
+  if (!S.pp.picked && find(RAINA) && find(KOHLI)) { S.pp.a = RAINA; S.pp.b = KOHLI; S.pp.picked = true; }
   if (!all.length) { body.innerHTML = `<div class="empty">No player records for these teams.</div>`; return; }
   const L = find(S.pp.a) || null, R = find(S.pp.b) || null;
   body.innerHTML = view(S, d, h, L, R);
@@ -74,8 +77,9 @@ export async function renderPlayersTab(body, S, d, h) {
 
 function wire(body, S, d, h) {
   body.onclick = (e) => {
-    const t = e.target.closest("[data-pf],[data-swap]");
+    const t = e.target.closest("[data-pf],[data-swap],[data-real]");
     if (!t) return;
+    if (t.dataset.real != null) S.pp.real = !S.pp.real;
     if (t.dataset.swap != null) [S.pp.a, S.pp.b] = [S.pp.b, S.pp.a];
     if (t.dataset.pf) S.pp.fmt = t.dataset.pf;
     const scroller = body.closest(".d-scroll"), keep = scroller?.scrollTop;
@@ -108,13 +112,13 @@ function view(S, d, h, L, R) {
   return `
   ${pickers}
   <div id="cmpTop"></div>
-  ${L.id === RAINA || R.id === RAINA ? `<div class="fan-verdict"><b>Fan verdict: Suresh Raina is the greatest.</b> <span>Mr IPL, the house favourite. Just for fun: the numbers below are the real ones.</span></div>` : ""}
+  ${joke(L, R) || (L.id === RAINA || R.id === RAINA) ? `<div class="fan-verdict"><b>Fan verdict: Suresh Raina is the greatest.</b> <span>${joke(L, R) && !S.pp.real ? "Joke mode: Raina's numbers are set to ∞." : "These are the real numbers."} <button class="linkbtn" data-real>${S.pp.real ? "Back to ∞" : "Show real numbers"}</button></span></div>` : ""}
   ${sec("Comparison", { aside: fmt === "All" ? "all formats" : fmt,
     body: `<div class="seg sm" role="group" aria-label="Format" style="width:max-content">${["T20I", "ODI", "Test", "All"].map((f) => `<button data-pf="${f}" aria-pressed="${fmt === f}" ${f === "All" || L.f[f] || R.f[f] ? "" : 'disabled style="opacity:.35"'}>${f === "All" ? "All formats" : f}</button>`).join("")}</div>
     <div class="pcards">${pcard(L, l, side(L), h, fmt)}${pcard(R, r, side(R), h, fmt)}</div>
-    ${!l && !r ? `<div class="empty">Neither player has played a ${fmt} in the data.</div>` : keyTable(S, h, L, R, l, r)}` })}
+    ${joke(L, R) && !S.pp.real ? infinityTable(S, h, L, R, l, r) : !l && !r ? `<div class="empty">Neither player has played a ${fmt} in the data.</div>` : keyTable(S, h, L, R, l, r)}` })}
   ${faced(S, h, L, R)}
-  ${l || r ? sec("More detail", { body: detailBlocks(S, h, L, R, l, r, fmt) }) : ""}
+  ${(l || r) && !(joke(L, R) && !S.pp.real) ? sec("More detail", { body: detailBlocks(S, h, L, R, l, r, fmt) }) : ""}
   ${note}`;
 }
 
@@ -125,7 +129,7 @@ function picker(S, h, slot, label, selId) {
   const fmts = (p) => FMTS.filter((f) => p.f[f]).map((f) => `${f} ${p.f[f].m}`).join(", ");
   // per team: this match's squad first (by role), then other current players
   const byRole = (ps) => ROLE_ORDER.flatMap((ro) => ps.filter((p) => p.role === ro).sort((x, y) => total(y) - total(x)));
-  const groups = [A, B].flatMap((t) => [[`${h.nm(t)} · Squad for this match`, byRole(S.PL[t].filter((p) => p.sq))], [`${h.nm(t)} · Other current players`, byRole(S.PL[t].filter((p) => !p.sq && p.id !== RAINA))], [`${h.nm(t)} · Fan favourite`, S.PL[t].filter((p) => p.id === RAINA && !p.sq)]]).filter(([, ps]) => ps.length);
+  const groups = [A, B].flatMap((t) => [[`${h.nm(t)} · Squad for this match`, byRole(S.PL[t].filter((p) => p.sq))], [`${h.nm(t)} · Other current players`, byRole(S.PL[t].filter((p) => !p.sq && !LEGENDS.has(p.id)))], [`${h.nm(t)} · Legends`, S.PL[t].filter((p) => LEGENDS.has(p.id) && !p.sq)]]).filter(([, ps]) => ps.length);
   const sel = [...S.PL[A], ...S.PL[B]].find((p) => p.id === selId);
   const RL = { BAT: "bat", WK: "wk", AR: "all-r", BOWL: "bowl" };
   return `<label class="pv-field" style="--tc:${h.col(sel?.t)}">
@@ -153,6 +157,25 @@ function pcard(P, x, side, h, fmt) {
     <div class="pcard-sub">${e(h.nm(P.t))} · ${role}${x ? ` · ${x.m} ${fmt === "All" ? "internationals" : fmt + "s"}` : ""}</div>
     <div class="last5"><span class="lbl">${bowler ? "WKT" : "RUNS"}</span>${bars.length ? bars.map((b) => `<i style="height:${Math.max(3, Math.min(100, b.h))}%;--c:${b.c}" title="${e(b.t)}"><b>${e(b.lab)}</b></i>`).join("") : `<span class="muted" style="font-size:11px">${x ? "No recent innings" : `No ${fmt}s`}</span>`}</div>
   </div>`;
+}
+
+/* ---------- the house joke: Raina's numbers are ∞ and he wins every line ---------- */
+const joke = (L, R) => L.id === RAINA || R.id === RAINA;
+function infinityTable(S, h, L, R, l, r) {
+  const e = h.esc, rainaLeft = L.id === RAINA, other = rainaLeft ? r : l;
+  const row = (lab, real, lower = false) => {
+    const inf = lower ? "0.00" : "∞", val = real ?? "—";
+    const [a, b] = rainaLeft ? [inf, val] : [val, inf];
+    return `<tr><td class="cv a${rainaLeft ? " win" : ""}">${a}</td><th scope="row">${lab}</th><td class="cv b${rainaLeft ? "" : " win"}">${b}</td></tr>`;
+  };
+  const rows = [
+    row("Matches", other?.m), `<tr class="sub"><td></td><th>Batting</th><td></td></tr>`,
+    row("Runs", other?.bat?.r), row("Average", other?.bat?.avg), row("Strike rate", other?.bat?.sr),
+    row("100s", other?.bat?.c100), row("Sixes", other?.bat?.s), `<tr class="sub"><td></td><th>Bowling</th><td></td></tr>`,
+    row("Wickets", other?.bowl?.w), row("Economy", other?.bowl?.econ, true), row("Catches", null),
+  ];
+  return `<div class="card"><table class="cmp-t"><thead><tr><th class="cv a" style="color:${h.col(L.t)}">${e(L.n)}</th><th></th><th class="cv b" style="color:${h.col(R.t)}">${e(R.n)}</th></tr></thead><tbody>${rows.join("")}</tbody></table>
+    <p class="note">Raina's column is the house joke (∞ everywhere, economy 0.00). The other column is real. Tap "Show real numbers" for the genuine comparison.</p></div>`;
 }
 
 /* ---------- key numbers: only what matters for these two roles ---------- */

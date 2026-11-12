@@ -1,6 +1,7 @@
 // AI brief tab: assembles the dossier into a compact context, asks /api/brief (Gemini Flash) to write it,
 // and falls back to a data-only draft when the API isn't reachable.
 import { deliver, tgStatus } from "./telegram.js";
+import { comparePanel } from "./compare.js";
 import { winModel, predictXI, formLine, venueTrends, h2hRows, batFirstSplit, matchupEdge, pct, condTags, CONDITIONS } from "./stats.js";
 
 const STEPS = [
@@ -77,12 +78,12 @@ export function localBrief(c) {
 
 // The AI desk: one tool on screen at a time.
 export function renderBriefTab(body, S, d, h) {
-  S.aiMode ||= "brief";
-  const modes = [["brief", "Research brief"], ["ask", "Ask Third Man"], ["newsletter", "Newsletter draft"]];
+  if (!["brief", "ask", "compare"].includes(S.aiMode)) S.aiMode = "brief";
+  const modes = [["brief", "Research brief"], ["ask", "Ask Third Man"], ["compare", "Compare players"]];
   body.innerHTML = `<div class="seg sm ai-switch" role="group" aria-label="AI tool">${modes.map(([k, l]) => `<button data-ai="${k}" aria-pressed="${S.aiMode === k}">${l}</button>`).join("")}</div><div id="aiPanel"></div>`;
   body.querySelectorAll("[data-ai]").forEach((b) => (b.onclick = () => { S.aiMode = b.dataset.ai; renderBriefTab(body, S, d, h); }));
   const panel = body.querySelector("#aiPanel");
-  ({ brief: briefPanel, newsletter: newsletterPanel, ask: askPanel })[S.aiMode](panel, S, d, h);
+  ({ brief: briefPanel, compare: comparePanel, ask: askPanel })[S.aiMode](panel, S, d, h);
 }
 
 function briefPanel(body, S, d, h) {

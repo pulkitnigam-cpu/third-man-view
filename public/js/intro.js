@@ -10,7 +10,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 // Delivery timeline (seconds after the zoom-out starts)
 const T_ZOOM = 1.0;          // red close-up pulls back to the bowler's hand
-const T_PITCH = T_ZOOM + 0.95;
+const T_PITCH = T_ZOOM + 0.55; // real pace: ~0.55 s from release to pitch
 const T_HIT = T_PITCH + 0.035; // smothered on the half-volley, as it rises off the pitch
 const T_FLY = 1.2;            // seconds the ball is tracked after the hit, climbing away over cover
 const T_END = T_HIT + 3.0;    // hold on the celebration, then reveal the app
@@ -32,15 +32,15 @@ const POSE_KEYS = [
   // stance: knees flexed, slight crouch, bat grounded behind the back foot, head level and looking down the pitch
   [0, { fA: [0, 0.08, -0.28], fK: [0.2, 0.47, -0.22], fH: [0, 0.85, -0.1], bA: [0, 0.08, 0.28], bK: [0.18, 0.47, 0.22], bH: [0, 0.85, 0.1],
     sF: [0.24, 1.34, -0.16], sB: [0.18, 1.36, 0.18], hd: [0.26, 1.53, -0.1], hn: [0.42, 0.9, 0.06], eF: [0.38, 1.1, -0.12], eB: [0.34, 1.04, 0.18], phi: 168, dx: 0.06 }],
-  [T_ZOOM - 0.1, null], // hold the stance until the bowler lets go
+  [T_ZOOM - 0.45, null], // hold the stance; he starts down the track in the bowler's delivery stride
   // first step: front foot comes up and forward, the bat starts back
-  [T_ZOOM + 0.2, { fA: [0, 0.22, -0.78], fK: [0.12, 0.62, -0.56], fH: [0, 0.92, -0.36], bA: [0, 0.08, 0.2], bK: [0.08, 0.5, 0.0], bH: [0, 0.92, -0.16],
+  [T_ZOOM - 0.2, { fA: [0, 0.22, -0.78], fK: [0.12, 0.62, -0.56], fH: [0, 0.92, -0.36], bA: [0, 0.08, 0.2], bK: [0.08, 0.5, 0.0], bH: [0, 0.92, -0.16],
     sF: [0.1, 1.45, -0.42], sB: [0.06, 1.45, -0.06], hd: [0.1, 1.65, -0.32], hn: [0.2, 1.22, -0.06], eF: [0.18, 1.3, -0.3], eB: [0.16, 1.2, 0.0], phi: 100, dx: 0 }],
   // front foot down; the back foot skips in behind it; the bat is up
-  [T_ZOOM + 0.45, { fA: [-0.05, 0.08, -0.92], fK: [0.05, 0.5, -0.86], fH: [-0.05, 0.9, -0.76], bA: [-0.12, 0.2, -0.46], bK: [-0.04, 0.56, -0.5], bH: [-0.05, 0.9, -0.56],
+  [T_ZOOM + 0.05, { fA: [-0.05, 0.08, -0.92], fK: [0.05, 0.5, -0.86], fH: [-0.05, 0.9, -0.76], bA: [-0.12, 0.2, -0.46], bK: [-0.04, 0.56, -0.5], bH: [-0.05, 0.9, -0.56],
     sF: [0.02, 1.45, -0.84], sB: [-0.02, 1.45, -0.5], hd: [0.04, 1.65, -0.74], hn: [0.06, 1.5, -0.46], eF: [0.1, 1.46, -0.74], eB: [0.05, 1.36, -0.42], phi: 40, dx: -0.05 }],
   // back foot lands; the front foot lifts for the long final stride, moving slightly to leg to make room
-  [T_ZOOM + 0.7, { fA: [-0.1, 0.24, -1.52], fK: [0.02, 0.64, -1.36], fH: [-0.12, 0.9, -1.24], bA: [-0.16, 0.08, -0.8], bK: [-0.06, 0.5, -0.92], bH: [-0.12, 0.9, -1.04],
+  [T_ZOOM + 0.28, { fA: [-0.1, 0.24, -1.52], fK: [0.02, 0.64, -1.36], fH: [-0.12, 0.9, -1.24], bA: [-0.16, 0.08, -0.8], bK: [-0.06, 0.5, -0.92], bH: [-0.12, 0.9, -1.04],
     sF: [-0.06, 1.45, -1.3], sB: [-0.1, 1.45, -0.98], hd: [-0.04, 1.66, -1.2], hn: [-0.04, 1.56, -0.9], eF: [0.02, 1.5, -1.2], eB: [-0.04, 1.38, -0.86], phi: 30, dx: -0.05 }],
   // the shape: front foot planted pointing to extra cover, front knee bent with the head over it, back leg long on its
   // toe, high front elbow, bat at the top
@@ -177,7 +177,7 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     // TV-style camera: as the ball is released it zooms in on the batter (from 22 m away he is tiny), holds tight
     // through the step-out, the shape and the shot, then pulls back as the ball sails away
-    const zin = ease.inOut(clamp((t - T_ZOOM) / 0.55)), zout = ease.inOut(clamp((t - T_HIT - 0.3) / 0.8));
+    const zin = ease.inOut(clamp((t - T_ZOOM) / 0.3)), zout = ease.inOut(clamp((t - T_HIT - 0.3) / 0.8));
     const k = 1 + (CAM_ZOOM - 1) * zin - (CAM_ZOOM - 1.35) * zout;
     if (k > 1.001) {
       const [cx, cy] = proj(BAT_X0, 1.05, BAT_Z0 - 1.1);  // the middle of where the batter plays the shot
