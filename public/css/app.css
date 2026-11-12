@@ -663,3 +663,6 @@ body.choosing .rail,body.choosing .hint{opacity:0;pointer-events:none}
   .ch-card span{font-size:12.5px;line-height:1.4}
   .ch-in{gap:14px}
 }
+/* the featured path on top, the two match paths below */
+.ch-cards{grid-template-columns:1fr 1fr}
+@media (max-width:860px){.ch-cards{grid-template-columns:1fr}.ch-main{padding:18px 20px}.ch-main b{font-size:28px}.ch-go{right:18px;font-size:28px}}
