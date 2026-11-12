@@ -11,10 +11,11 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // Delivery timeline (seconds after the zoom-out starts)
 const T_ZOOM = 1.0;          // red close-up pulls back to the bowler's hand
 const T_PITCH = T_ZOOM + 0.95;
-const T_HIT = T_PITCH + 0.1;  // met on the half-volley, just after it pitches
+const T_HIT = T_PITCH + 0.035; // smothered on the half-volley, as it rises off the pitch
 const T_FLY = 1.2;            // seconds the ball is tracked after the hit, climbing away over cover
 const T_END = T_HIT + 3.0;    // hold on the celebration, then reveal the app
 // ?introspeed=0.2 slows the sequence down (for checking frames)
+const CAM_ZOOM = 2.7;           // how tight the camera goes on the batter
 const SPEED = Math.min(4, Math.max(0.05, +new URLSearchParams(location.search).get("introspeed") || 1));
 
 // World (metres): camera is the umpire behind the bowler's stumps, looking down the pitch.
@@ -43,13 +44,13 @@ const POSE_KEYS = [
     sF: [-0.06, 1.45, -1.3], sB: [-0.1, 1.45, -0.98], hd: [-0.04, 1.66, -1.2], hn: [-0.04, 1.56, -0.9], eF: [0.02, 1.5, -1.2], eB: [-0.04, 1.38, -0.86], phi: 30, dx: -0.05 }],
   // the shape: front foot planted pointing to extra cover, front knee bent with the head over it, back leg long on its
   // toe, high front elbow, bat at the top
-  [T_HIT - 0.1, { fA: [0, 0.08, -2.05], fK: [0.18, 0.5, -1.95], fH: [-0.06, 0.85, -1.7], bA: [-0.2, 0.1, -1.1], bK: [-0.1, 0.48, -1.36], bH: [-0.06, 0.86, -1.5],
+  [T_HIT - 0.1, { fA: [0.22, 0.08, -2.05], fK: [0.38, 0.5, -1.95], fH: [-0.06, 0.85, -1.7], bA: [-0.2, 0.1, -1.1], bK: [-0.1, 0.48, -1.36], bH: [-0.06, 0.86, -1.5],
     sF: [0.12, 1.38, -1.95], sB: [0, 1.4, -1.62], hd: [0.16, 1.56, -1.95], hn: [0.02, 1.48, -1.56], eF: [0.18, 1.56, -1.86], eB: [0, 1.3, -1.5], phi: 60, dx: 0 }],
   // contact under the eyes, just ahead of the front pad, the face opening towards cover
-  [T_HIT, { fA: [0, 0.08, -2.05], fK: [0.18, 0.5, -1.95], fH: [-0.04, 0.85, -1.72], bA: [-0.2, 0.12, -1.12], bK: [-0.1, 0.48, -1.38], bH: [-0.04, 0.86, -1.52],
-    sF: [0.16, 1.36, -1.98], sB: [0.02, 1.38, -1.66], hd: [0.2, 1.55, -1.98], hn: [0.32, 0.96, -2.18], eF: [0.3, 1.24, -2.06], eB: [0.2, 1.12, -1.86], phi: 205, dx: 0.25 }],
+  [T_HIT, { fA: [0.22, 0.08, -2.05], fK: [0.4, 0.48, -1.97], fH: [-0.04, 0.85, -1.72], bA: [-0.2, 0.12, -1.12], bK: [-0.1, 0.48, -1.38], bH: [-0.04, 0.86, -1.52],
+    sF: [0.16, 1.36, -1.98], sB: [0.02, 1.38, -1.66], hd: [0.24, 1.5, -2.0], hn: [0.34, 0.86, -2.12], eF: [0.34, 1.16, -2.06], eB: [0.24, 1.04, -1.86], phi: 190, dx: 0.2 }],
   // the finish: hands high, bat over the top, chest opened to the off side
-  [T_HIT + 0.4, { fA: [0, 0.08, -2.05], fK: [0.15, 0.52, -1.95], fH: [0, 0.88, -1.75], bA: [-0.2, 0.14, -1.15], bK: [-0.08, 0.5, -1.4], bH: [0, 0.88, -1.55],
+  [T_HIT + 0.4, { fA: [0.22, 0.08, -2.05], fK: [0.36, 0.52, -1.95], fH: [0, 0.88, -1.75], bA: [-0.2, 0.14, -1.15], bK: [-0.08, 0.5, -1.4], bH: [0, 0.88, -1.55],
     sF: [0.15, 1.42, -1.9], sB: [0.05, 1.42, -1.6], hd: [0.18, 1.6, -1.9], hn: [0.25, 1.95, -1.8], eF: [0.35, 1.7, -1.95], eB: [0.2, 1.7, -1.7], phi: 380, dx: 0.15 }],
 ];
 for (let i = 1; i < POSE_KEYS.length; i++) if (!POSE_KEYS[i][1]) POSE_KEYS[i][1] = POSE_KEYS[i - 1][1];
@@ -74,7 +75,7 @@ function batterPose(t) {
 // where the ball meets the bat: the sweet spot at the moment of contact
 const SWEET = 0.62;
 const P_HIT = (() => { const p = batterPose(T_HIT); return p.hn.map((v, i) => v + p.bat[i] * SWEET); })();
-const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [P_HIT[0] - 0.06, BALL_R, P_HIT[2] - 1.0];
+const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [P_HIT[0] - 0.03, BALL_R, P_HIT[2] - 0.32];
 // after the hit: lofted inside-out over extra cover, i.e. up and away to the off side (camera right), out of the top of the frame
 const flyPos = (u) => [P_HIT[0] + 7.5 * u, P_HIT[1] + 8.5 * u - 1.2 * u * u, P_HIT[2] - 6.5 * u];
 
@@ -172,7 +173,18 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     const shake = t > T_HIT && t < T_HIT + 0.18 ? (1 - (t - T_HIT) / 0.18) * 3 : 0;
     ctx.save();
     ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#03050b"; ctx.fillRect(0, 0, W, H);
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    // TV-style camera: as the ball is released it zooms in on the batter (from 22 m away he is tiny), holds tight
+    // through the step-out, the shape and the shot, then pulls back as the ball sails away
+    const zin = ease.inOut(clamp((t - T_ZOOM) / 0.55)), zout = ease.inOut(clamp((t - T_HIT - 0.3) / 0.8));
+    const k = 1 + (CAM_ZOOM - 1) * zin - (CAM_ZOOM - 1.35) * zout;
+    if (k > 1.001) {
+      const [cx, cy] = proj(BAT_X0, 1.05, BAT_Z0 - 1.1);  // the middle of where the batter plays the shot
+      const lift = (k - 1) / (CAM_ZOOM - 1);                 // bring him towards the middle of the screen as we zoom
+      const ox = cx + (W / 2 - cx) * lift, oy = cy + (H * 0.58 - cy) * lift;
+      ctx.translate(ox, oy); ctx.scale(k, k); ctx.translate(-cx, -cy);
+    }
     drawScene(t);
 
     const P = ballPos(t), spin = seam + t * 9;
@@ -248,6 +260,16 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     // shadow on the ground under the feet
     const g = mid(J.fA, J.bA), [gx, gy] = P([g[0], 0, g[2]]), gs = sc(g[2]);
     ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(gx + 0.08 * gs, gy, 0.45 * gs, 0.08 * gs, 0, 0, 7); ctx.fill();
+    // the arc of the swing: fading copies of the blade from the top of the backlift, past the front pad, up to the finish
+    if (t > T_HIT - 0.12 && t < T_HIT + 0.55) {
+      for (let i = 10; i >= 1; i--) {
+        const tp = t - i * 0.018;
+        if (tp < T_HIT - 0.12) continue;
+        const G = batterPose(tp), a = 0.28 * (1 - i / 11) * clamp((T_HIT + 0.55 - t) / 0.25);
+        const toe = G.hn.map((v, j) => v + G.bat[j] * 0.86), grip = G.hn.map((v, j) => v + G.bat[j] * 0.3);
+        line(grip, toe, 0.1, `rgba(255,236,190,${a})`);
+      }
+    }
     // legs: trousers to the knee, pads from just above it, shoes pointing towards the off side
     for (const [A, K, Hp, trouser] of [[J.bA, J.bK, J.bH, DEEP], [J.fA, J.fK, J.fH, BLUE]]) {
       limb(Hp, K, 0.17, trouser);
