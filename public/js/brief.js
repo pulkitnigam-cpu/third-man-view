@@ -77,8 +77,8 @@ export function localBrief(c) {
 
 // The AI desk: one tool on screen at a time.
 export function renderBriefTab(body, S, d, h) {
-  S.aiMode ||= "newsletter";
-  const modes = [["newsletter", "Newsletter"], ["brief", "Pre-match brief"], ["ask", "Ask Third Man"]];
+  S.aiMode ||= "brief";
+  const modes = [["brief", "Research brief"], ["ask", "Ask Third Man"], ["newsletter", "Newsletter draft"]];
   body.innerHTML = `<div class="seg sm ai-switch" role="group" aria-label="AI tool">${modes.map(([k, l]) => `<button data-ai="${k}" aria-pressed="${S.aiMode === k}">${l}</button>`).join("")}</div><div id="aiPanel"></div>`;
   body.querySelectorAll("[data-ai]").forEach((b) => (b.onclick = () => { S.aiMode = b.dataset.ai; renderBriefTab(body, S, d, h); }));
   const panel = body.querySelector("#aiPanel");
@@ -95,8 +95,11 @@ function briefPanel(body, S, d, h) {
       <button class="cta" id="genBrief" ${S.briefing ? "disabled" : ""}><span>${have ? "Regenerate brief" : "Generate brief with Gemini Flash"}</span><span aria-hidden="true">→</span></button>
       <div id="briefSteps"></div>
     </section>
+    ${S.newsPrep ? `<p class="note">Gathering squads, pitch notes and the latest form first…</p>` : ""}
     <div id="briefOut">${have ? briefHTML(have.brief, have.via, h, S) : ""}</div>`;
   body.querySelector("#genBrief").onclick = () => run(body, S, d, h, key);
+  // one-click flow: everything is gathered, so start the research brief
+  if (S.autoNews && !S.briefing && !S.newsPrep) { S.autoNews = false; run(body, S, d, h, key); }
   wireCopy(body, S);
 }
 

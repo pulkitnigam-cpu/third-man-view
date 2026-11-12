@@ -12,7 +12,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const pc = (a, b) => { const v = pct(a, b); return v == null ? "—" : `${v}%`; };
 const dmy = (d) => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const fmtTime = (iso, tz) => new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz }).format(new Date(iso));
-const TABS = [["overview", "Overview"], ["h2h", "Head-to-head"], ["venue", "Venue & conditions"], ["squads", "Squads & form"], ["matchups", "Players & matchups"], ["brief", "✦ Write"]];
+const TABS = [["overview", "Overview"], ["h2h", "Head-to-head"], ["venue", "Venue & conditions"], ["squads", "Squads & form"], ["matchups", "Players & matchups"], ["brief", "✦ Research brief"]];
 
 let S = null; // current dossier state
 
@@ -28,7 +28,7 @@ export function closeDossier() {
 export async function openDossier(ctx) {
   const el = $("#dossier");
   const token = Symbol();
-  S = { ...ctx, token, fmt: ctx.fx.fmt, win: "all", tab: ctx.autoNews ? "brief" : "overview", aiMode: ctx.autoNews ? "newsletter" : undefined, newsPrep: !!ctx.autoNews, forecast: undefined, pp: null, PL: null, muSide: "a", sqShow: "a", openPl: new Set(), showAllRes: false, brief: null };
+  S = { ...ctx, token, fmt: ctx.fx.fmt, win: "all", tab: ctx.autoNews ? "brief" : "overview", aiMode: ctx.autoNews ? "brief" : undefined, newsPrep: !!ctx.autoNews, forecast: undefined, pp: null, PL: null, muSide: "a", sqShow: "a", openPl: new Set(), showAllRes: false, brief: null };
   const { fx, TEAMS } = ctx;
   el.style.setProperty("--a", TEAMS[fx.a]?.c || "#8fd3ff");
   el.style.setProperty("--b", TEAMS[fx.b]?.c && TEAMS[fx.b].c !== TEAMS[fx.a]?.c ? TEAMS[fx.b].c : "#cfd6de");

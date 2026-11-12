@@ -1,7 +1,8 @@
 // Opening sequence, drawn on one canvas:
 // 1. the whole screen is a close-up of a red leather ball (with "Welcome" + a loading bar on top)
 // 2. once loaded, the red pulls back and turns out to be the ball, delivered down the pitch from the umpire's view
-// 3. it pitches, hits the stumps, bails fly, the crowd roars, and the app is revealed.
+// 3. a left-handed batter (India blue, No. 3) makes room and lofts it inside-out over extra cover for six;
+//    the ball sails over the camera, the crowd roars and flashes, and the app is revealed.
 
 const ease = { inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2), out: (t) => 1 - Math.pow(1 - t, 3), in: (t) => t * t * t };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -10,14 +11,19 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // Delivery timeline (seconds after the zoom-out starts)
 const T_ZOOM = 1.0;          // red close-up pulls back to the bowler's hand
 const T_PITCH = T_ZOOM + 0.85;
-const T_HIT = T_PITCH + 0.38;
-const T_END = T_HIT + 2.4;   // hold on the celebration, then reveal the app
+const T_HIT = T_PITCH + 0.34; // bat meets ball
+const T_FLY = 1.1;           // seconds the ball is tracked after the hit, rising over the camera
+const T_END = T_HIT + 3.0;   // hold on the celebration, then reveal the app
 // ?introspeed=0.2 slows the sequence down (for checking frames)
 const SPEED = Math.min(4, Math.max(0.05, +new URLSearchParams(location.search).get("introspeed") || 1));
 
 // World (metres): camera is the umpire behind the bowler's stumps, looking down the pitch.
 const CAM_H = 1.65, STUMPS_Z = 21.6, BALL_R = 0.11; // ball drawn ~3x real size so it reads on screen
-const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [0.06, BALL_R, 16.2], P_HIT = [0.0, 0.43, STUMPS_Z - 0.05];
+const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [0.12, BALL_R, 15.6], P_HIT = [0.3, 0.74, 19.4];
+// the batter: feet on the popping crease, body on the leg side (camera left) of a left-hander's stumps
+const BAT_Z = STUMPS_Z - 1.1, BAT_X = -0.3;
+// after the hit: up, towards the camera and off to its right (extra cover), out of the top of the frame
+const flyPos = (u) => [P_HIT[0] + 3.4 * u, P_HIT[1] + 6.2 * u - 0.6 * u * u, P_HIT[2] - 9.5 * u];
 
 export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio, onDone }) {
   const root = document.getElementById("intro");
@@ -62,7 +68,7 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
       drawRed(seam);
       const k = loaded ? clamp(el / MIN_RED) : Math.min(0.9, el / MIN_RED);
       fill.style.width = `${ease.out(k) * 100}%`;
-      status.textContent = k < 0.35 ? "Checking today's fixtures" : k < 0.75 ? "Loading head-to-head records" : k < 1 ? "Setting up the globe" : "Ready";
+      status.textContent = k < 0.35 ? "Opening the scorebook" : k < 0.75 ? "Reading head-to-head records" : k < 1 ? "Rolling out the globe" : "Ready to research";
       if (k >= 1 && !tap.classList.contains("on")) {
         tap.classList.add("on");
         // the tap unlocks the sound (browsers block audio until the visitor interacts), so wait for it;
@@ -109,63 +115,120 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
   }
 
   function drawDelivery(t) {
-    // camera shake on impact
-    const shake = t > T_HIT && t < T_HIT + 0.3 ? (1 - (t - T_HIT) / 0.3) * 7 : 0;
+    // a small jolt as bat meets ball
+    const shake = t > T_HIT && t < T_HIT + 0.18 ? (1 - (t - T_HIT) / 0.18) * 3 : 0;
     ctx.save();
     ctx.clearRect(0, 0, W, H);
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     drawScene(t);
 
-    // ball position
-    let X, Y, Z, spin = seam + t * 9;
-    if (t < T_ZOOM) { [X, Y, Z] = P_RELEASE; }
-    else if (t < T_PITCH) {
-      const u = (t - T_ZOOM) / (T_PITCH - T_ZOOM);
-      X = lerp(P_RELEASE[0], P_PITCH[0], u); Z = lerp(P_RELEASE[2], P_PITCH[2], u);
-      Y = lerp(P_RELEASE[1], P_PITCH[1], u) + 0.35 * u * (1 - u); // slight loop above the straight line
-    } else if (t < T_HIT) {
-      const u = (t - T_PITCH) / (T_HIT - T_PITCH);
-      X = lerp(P_PITCH[0], P_HIT[0], u); Z = lerp(P_PITCH[2], P_HIT[2], u);
-      Y = lerp(P_PITCH[1], P_HIT[1], u) + 0.2 * u * (1 - u);
-    } else {
-      const u = t - T_HIT; // deflects off the stumps and dies away
-      X = P_HIT[0] - 0.6 * u; Z = P_HIT[2] - 1.5 * u; Y = Math.max(BALL_R, P_HIT[1] + 0.9 * u - 4.9 * u * u);
-    }
-    const [bx, by] = proj(X, Y, Z), br = (scene.f * BALL_R) / Z;
-
+    const P = ballPos(t), spin = seam + t * 9;
     // dust where it pitches
     if (t > T_PITCH && t < T_PITCH + 0.6) dust(proj(P_PITCH[0], 0, P_PITCH[2]), (t - T_PITCH) / 0.6, (scene.f * 0.5) / P_PITCH[2]);
 
     if (t < T_ZOOM) {
       // the red close-up pulls back to the ball in the bowler's hand
+      const [bx, by] = proj(...P), br = (scene.f * BALL_R) / P[2];
       const u = ease.inOut(clamp(t / T_ZOOM));
       const R0 = Math.hypot(W, H) * 0.9;
       const r = Math.exp(lerp(Math.log(R0), Math.log(br), u));
       ball(lerp(W / 2 + R0 * 0.12, bx, u), lerp(H / 2 + R0 * 0.05, by, u), r, spin, 1);
-    } else if (t < T_HIT + 0.9) {
-      // shadow + motion trail + ball
-      const [sx, sy] = proj(X, 0, Z);
-      ctx.fillStyle = `rgba(0,0,0,${0.35 * clamp(1 - (Y - BALL_R) / 2)})`;
-      ctx.beginPath(); ctx.ellipse(sx, sy, br * 1.1, br * 0.35, 0, 0, Math.PI * 2); ctx.fill();
-      if (t < T_HIT) for (let i = 1; i <= 4; i++) {
-        const tt = t - i * 0.022, back = trailPos(tt);
-        if (!back) continue;
-        const [tx, ty] = proj(...back);
-        ctx.fillStyle = `rgba(200,16,46,${0.16 - i * 0.03})`;
-        ctx.beginPath(); ctx.arc(tx, ty, (scene.f * BALL_R) / back[2], 0, Math.PI * 2); ctx.fill();
+    } else if (P) {
+      const [bx, by] = proj(...P), br = (scene.f * BALL_R) / P[2];
+      if (by > -br * 2 && bx < W + br * 2) {
+        // shadow (only near the ground) + motion trail + ball
+        const [sx, sy] = proj(P[0], 0, P[2]);
+        const sh = 0.35 * clamp(1 - (P[1] - BALL_R) / 2);
+        if (sh > 0.01) { ctx.fillStyle = `rgba(0,0,0,${sh})`; ctx.beginPath(); ctx.ellipse(sx, sy, br * 1.1, br * 0.35, 0, 0, Math.PI * 2); ctx.fill(); }
+        for (let i = 1; i <= 4; i++) {
+          const back = ballPos(t - i * (t > T_HIT ? 0.03 : 0.022));
+          if (!back || back[2] < 1) continue;
+          const [tx, ty] = proj(...back);
+          ctx.fillStyle = `rgba(200,16,46,${0.16 - i * 0.03})`;
+          ctx.beginPath(); ctx.arc(tx, ty, (scene.f * BALL_R) / back[2], 0, Math.PI * 2); ctx.fill();
+        }
+        ball(bx, by, br, spin, 1);
       }
-      ball(bx, by, br, spin, t > T_HIT ? clamp(1 - (t - T_HIT) / 0.9) : 1);
     }
     if (t >= T_HIT && !scene.hit) { scene.hit = true; impact(); }
     ctx.restore();
 
-    // white flash on impact
-    if (t > T_HIT && t < T_HIT + 0.18) { ctx.fillStyle = `rgba(255,250,235,${0.35 * (1 - (t - T_HIT) / 0.18)})`; ctx.fillRect(0, 0, W, H); }
+    // a quick flash as it's struck, then "SIX" once the ball has cleared the frame
+    if (t > T_HIT && t < T_HIT + 0.12) { ctx.fillStyle = `rgba(255,250,235,${0.18 * (1 - (t - T_HIT) / 0.12)})`; ctx.fillRect(0, 0, W, H); }
+    if (t > T_HIT + 0.55) sixCall(clamp((t - T_HIT - 0.55) / 0.35), clamp((T_END - t) / 0.5));
   }
-  function trailPos(t) {
-    if (t < T_ZOOM) return null;
+  // where the ball is at time t: release → pitch → bat, then up and away over extra cover
+  function ballPos(t) {
+    if (t < T_ZOOM) return P_RELEASE;
     if (t < T_PITCH) { const u = (t - T_ZOOM) / (T_PITCH - T_ZOOM); return [lerp(P_RELEASE[0], P_PITCH[0], u), lerp(P_RELEASE[1], P_PITCH[1], u) + 0.35 * u * (1 - u), lerp(P_RELEASE[2], P_PITCH[2], u)]; }
-    const u = (t - T_PITCH) / (T_HIT - T_PITCH); return [lerp(P_PITCH[0], P_HIT[0], u), lerp(P_PITCH[1], P_HIT[1], u) + 0.2 * u * (1 - u), lerp(P_PITCH[2], P_HIT[2], u)];
+    if (t < T_HIT) { const u = (t - T_PITCH) / (T_HIT - T_PITCH); return [lerp(P_PITCH[0], P_HIT[0], u), lerp(P_PITCH[1], P_HIT[1], u) + 0.2 * u * (1 - u), lerp(P_PITCH[2], P_HIT[2], u)]; }
+    const u = (t - T_HIT) / T_FLY;
+    return u > 1 ? null : flyPos(u);
+  }
+
+  // the big "SIX" call over the stands
+  function sixCall(a, out) {
+    const alpha = Math.min(ease.out(a), out);
+    if (alpha <= 0) return;
+    const size = Math.min(W * 0.22, H * 0.2), y = scene.standTop + size * 0.2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `900 ${size * (0.9 + 0.1 * ease.out(a))}px ${getComputedStyle(document.documentElement).getPropertyValue("--display") || "Impact, sans-serif"}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(255,200,80,.55)"; ctx.shadowBlur = size * 0.25;
+    ctx.fillStyle = "#fff6dc"; ctx.fillText("SIX", W / 2, y);
+    ctx.restore();
+  }
+
+  // A left-handed batter seen from the bowler's end, in India blue. Pose keys run stance → backlift (stepping to
+  // leg to make room) → contact out in front → a high, open follow-through over extra cover.
+  function drawBatter(t) {
+    const keys = [
+      [0, { th: 0.25, hx: 0.12, hy: 0.92, sh: 0, fx: 0.16, lean: 0 }],
+      [T_PITCH - 0.32, { th: 0.25, hx: 0.12, hy: 0.92, sh: 0, fx: 0.16, lean: 0 }],
+      [T_HIT - 0.1, { th: -2.5, hx: -0.2, hy: 1.48, sh: -0.32, fx: 0.18, lean: -0.08 }],
+      [T_HIT, { th: 0.45, hx: 0.22, hy: 0.88, sh: -0.3, fx: 0.34, lean: 0.12 }],
+      [T_HIT + 0.32, { th: 2.6, hx: 0.42, hy: 1.8, sh: -0.3, fx: 0.34, lean: 0.04 }],
+    ];
+    let p = keys.at(-1)[1];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const [ta, a] = keys[i], [tb, b] = keys[i + 1];
+      if (t >= ta && t < tb) { const u = (i === 2 ? ease.in : ease.inOut)(clamp((t - ta) / (tb - ta))); p = Object.fromEntries(Object.keys(a).map((k) => [k, lerp(a[k], b[k], u)])); break; }
+    }
+    const [x0, y0] = proj(BAT_X + p.sh, 0, BAT_Z), s = scene.f / BAT_Z;
+    const X = (x) => x0 + x * s, Y = (y) => y0 - y * s;
+    const seg = (x1, y1, x2, y2, w, col) => { ctx.strokeStyle = col; ctx.lineWidth = w * s; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke(); };
+    const BLUE = "#1d4fb3", DEEP = "#123577", PAD = "#f3f1ea", SAFFRON = "#ff8a1f";
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(X(0.05), Y(0), 0.42 * s, 0.07 * s, 0, 0, 7); ctx.fill();
+    const hip = 0.95, sho = 1.44, lean = p.lean;
+    // back leg (camera left) and front leg striding towards off side (camera right), trousers then pads
+    seg(-0.08 + lean * 0.5, hip, -0.2, 0.06, 0.15, DEEP); seg(-0.17, 0.52, -0.2, 0.05, 0.19, PAD);
+    seg(0.08 + lean * 0.5, hip, p.fx, 0.06, 0.15, BLUE); seg(p.fx * 0.85, 0.52, p.fx, 0.05, 0.19, PAD);
+    seg(-0.22, 0.03, -0.12, 0.02, 0.1, "#e8e4da"); seg(p.fx - 0.02, 0.03, p.fx + 0.1, 0.02, 0.1, "#e8e4da"); // shoes
+    // torso with saffron trim and the No. 3
+    const tx = lean * 0.5;
+    ctx.fillStyle = BLUE; ctx.beginPath();
+    ctx.moveTo(X(tx - 0.16), Y(hip)); ctx.lineTo(X(tx + 0.16), Y(hip)); ctx.lineTo(X(lean + 0.19), Y(sho)); ctx.lineTo(X(lean - 0.19), Y(sho)); ctx.closePath(); ctx.fill();
+    seg(lean - 0.18, sho - 0.02, lean + 0.18, sho - 0.02, 0.035, SAFFRON);
+    ctx.fillStyle = "#fff"; ctx.font = `800 ${0.15 * s}px ${getComputedStyle(document.documentElement).getPropertyValue("--display") || "Impact"}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("3", X(tx + lean * 0.5), Y((hip + sho) / 2));
+    // back arm, bat, front arm, gloves
+    const shL = [lean - 0.17, sho - 0.04], shR = [lean + 0.17, sho - 0.04];
+    seg(shL[0], shL[1], p.hx - 0.03, p.hy, 0.085, DEEP);
+    const dx = Math.sin(p.th), dy = -Math.cos(p.th); // screen direction of the bat from the hands (y up in metres)
+    const hx = p.hx, hy = p.hy;
+    seg(hx, hy, hx + dx * 0.28, hy + dy * 0.28, 0.045, "#2b2b2b"); // handle grip
+    seg(hx + dx * 0.28, hy + dy * 0.28, hx + dx * 0.86, hy + dy * 0.86, 0.11, "#e8cf96"); // blade
+    seg(hx + dx * 0.3, hy + dy * 0.3, hx + dx * 0.84, hy + dy * 0.84, 0.03, "#c9a865"); // edge shading
+    seg(shR[0], shR[1], p.hx + 0.03, p.hy, 0.085, BLUE);
+    ctx.fillStyle = PAD; ctx.beginPath(); ctx.arc(X(hx), Y(hy), 0.06 * s, 0, 7); ctx.fill();
+    // helmet with grille, looking down the pitch
+    const hdx = lean, hdy = sho + 0.17;
+    ctx.fillStyle = "#0f1d47"; ctx.beginPath(); ctx.arc(X(hdx), Y(hdy), 0.12 * s, Math.PI, 0); ctx.lineTo(X(hdx + 0.12), Y(hdy - 0.02)); ctx.lineTo(X(hdx - 0.12), Y(hdy - 0.02)); ctx.fill();
+    seg(hdx - 0.13, hdy - 0.01, hdx + 0.15, hdy - 0.01, 0.03, "#0f1d47"); // peak
+    ctx.strokeStyle = "rgba(210,215,225,.85)"; ctx.lineWidth = Math.max(1, 0.012 * s);
+    for (const gy of [0.04, 0.08, 0.12]) { ctx.beginPath(); ctx.moveTo(X(hdx - 0.09), Y(hdy - gy)); ctx.lineTo(X(hdx + 0.09), Y(hdy - gy)); ctx.stroke(); }
   }
 
   // A leather ball: deep red radial shading, grain, and a stitched seam that turns with `rot`.
@@ -212,11 +275,12 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     // stands + crowd
     ctx.fillStyle = s.standFill; ctx.beginPath(); ctx.moveTo(0, s.standTop + 30); ctx.quadraticCurveTo(W / 2, s.standTop - 22, W, s.standTop + 30); ctx.lineTo(W, s.hy + 4); ctx.lineTo(0, s.hy + 4); ctx.fill();
     ctx.strokeStyle = "rgba(200,215,240,.25)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(0, s.standTop + 30); ctx.quadraticCurveTo(W / 2, s.standTop - 22, W, s.standTop + 30); ctx.stroke();
-    const cheer = s.hit ? clamp(1 - (t - T_HIT) / 2.4) : 0;
+    // the crowd jumps and the camera flashes go off once the ball is on its way into the stands
+    const cheer = s.hit ? clamp((t - T_HIT) / 0.25) * clamp(1 - (t - T_HIT - 0.4) / 2.6) : 0;
     for (const c of s.crowd) {
-      const jump = cheer ? Math.abs(Math.sin(t * c.f + c.p)) * 2.5 * cheer : 0;
+      const jump = cheer ? Math.abs(Math.sin(t * c.f + c.p)) * 3.2 * cheer : 0;
       ctx.fillStyle = c.col; ctx.fillRect(c.x, c.y - jump, c.s, c.s);
-      if (cheer && Math.random() < 0.004) { ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath(); ctx.arc(c.x, c.y, 2.2, 0, 7); ctx.fill(); } // camera flashes
+      if (cheer && Math.random() < 0.012 * cheer) { ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.beginPath(); ctx.arc(c.x, c.y, 2.4, 0, 7); ctx.fill(); }
     }
     // floodlight towers
     for (const L of s.lights) {
@@ -242,39 +306,24 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     line(-1.83, STUMPS_Z - 1.22, 1.83, STUMPS_Z - 1.22); line(-1.32, STUMPS_Z, 1.32, STUMPS_Z);
     line(-1.32, STUMPS_Z - 1.22, -1.32, STUMPS_Z + 0.6); line(1.32, STUMPS_Z - 1.22, 1.32, STUMPS_Z + 0.6);
     line(-1.83, 2.6, 1.83, 2.6); line(-1.32, 2.6, -1.32, 1.0); line(1.32, 2.6, 1.32, 1.0);
-    drawStumps(t);
+    drawStumps();
+    drawBatter(t);
     // vignette so the scene reads as night
     ctx.fillStyle = s.vignette; ctx.fillRect(0, 0, W, H);
     if (fade < 1) { ctx.fillStyle = `rgba(4,6,12,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
   }
 
-  function drawStumps(t) {
-    const hit = t > T_HIT ? t - T_HIT : 0;
-    const xs = [-0.111, 0, 0.111];
+  // the far stumps, with bails, behind the batter (they stay standing: the ball goes for six)
+  function drawStumps() {
     const [, baseY] = proj(0, 0, STUMPS_Z), [, topY] = proj(0, 0.711, STUMPS_Z);
     const h = baseY - topY, w = Math.max(2, (scene.f * 0.036) / STUMPS_Z);
-    xs.forEach((x, i) => {
+    for (const x of [-0.111, 0, 0.111]) {
       const [sx] = proj(x, 0, STUMPS_Z);
-      // middle stump is knocked back hardest; the others splay
-      const k = ease.out(clamp(hit / 0.35));
-      const ang = [-0.16, 0.05, 0.3][i] * k, squash = i === 1 ? 1 - 0.55 * k : 1 - 0.12 * k;
-      ctx.save(); ctx.translate(sx, baseY); ctx.rotate(ang);
-      const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); g.addColorStop(0, "#d9c7a0"); g.addColorStop(0.45, "#fff5dc"); g.addColorStop(1, "#bfa979");
-      ctx.fillStyle = g; ctx.fillRect(-w / 2, -h * squash, w, h * squash);
-      ctx.restore();
-    });
-    // bails: sit on top, then fly
-    const [lx] = proj(-0.111, 0, STUMPS_Z), [rx] = proj(0.111, 0, STUMPS_Z), bw = (rx - lx) / 2 + 1, bh = Math.max(2, w * 0.55);
-    for (const [j, x0] of [[0, lx], [1, (lx + rx) / 2]]) {
-      let x = x0, y = topY - bh, rot = 0;
-      if (hit) {
-        // pop up, then drop and settle just behind the stumps
-        const vx = (j ? 1.1 : -0.9) * h, vy = -4.6 * h, g = 12 * h, ground = baseY - bh * (1.2 + j);
-        const tLand = (-vy + Math.sqrt(vy * vy + 2 * g * (ground - y))) / g, tt = Math.min(hit, tLand);
-        x += vx * tt; y += vy * tt + 0.5 * g * tt * tt; rot = (j ? 8 : -7) * tt;
-      }
-      ctx.save(); ctx.translate(x + bw / 2, y + bh / 2); ctx.rotate(rot); ctx.fillStyle = "#f6ead0"; ctx.fillRect(-bw / 2, -bh / 2, bw, bh); ctx.restore();
+      const g = ctx.createLinearGradient(sx - w / 2, 0, sx + w / 2, 0); g.addColorStop(0, "#d9c7a0"); g.addColorStop(0.45, "#fff5dc"); g.addColorStop(1, "#bfa979");
+      ctx.fillStyle = g; ctx.fillRect(sx - w / 2, topY, w, h);
     }
+    const [lx] = proj(-0.111, 0, STUMPS_Z), [rx] = proj(0.111, 0, STUMPS_Z), bh = Math.max(2, w * 0.55);
+    ctx.fillStyle = "#f6ead0"; ctx.fillRect(lx, topY - bh, rx - lx, bh);
   }
 
   function dust([x, y], u, size) {
@@ -302,15 +351,15 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
   function impact() {
     let ac; try { ac = getAudio(); } catch { return; }
     const t = ac.currentTime;
-    // wooden crack of the stumps
+    // the sweet-spot "tok" of willow on leather: a short knock with a bright click on top
     const crack = ac.createBufferSource(), hp = ac.createBiquadFilter(), cg = ac.createGain();
-    crack.buffer = noiseBuffer(ac, 0.12); hp.type = "bandpass"; hp.frequency.value = 2600; hp.Q.value = 0.9;
-    cg.gain.setValueAtTime(0.5, t); cg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    crack.buffer = noiseBuffer(ac, 0.06); hp.type = "bandpass"; hp.frequency.value = 2100; hp.Q.value = 1.6;
+    cg.gain.setValueAtTime(0.55, t); cg.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     crack.connect(hp).connect(cg).connect(ac.destination); crack.start(t);
-    const thud = ac.createOscillator(), tg = ac.createGain();
-    thud.frequency.setValueAtTime(220, t); thud.frequency.exponentialRampToValueAtTime(70, t + 0.12);
-    tg.gain.setValueAtTime(0.35, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    thud.connect(tg).connect(ac.destination); thud.start(t); thud.stop(t + 0.2);
+    const knock = ac.createOscillator(), tg = ac.createGain();
+    knock.type = "sine"; knock.frequency.setValueAtTime(1150, t); knock.frequency.exponentialRampToValueAtTime(560, t + 0.07);
+    tg.gain.setValueAtTime(0.4, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    knock.connect(tg).connect(ac.destination); knock.start(t); knock.stop(t + 0.12);
     // crowd roar: several noise bands, wobbling like many voices, swelling then fading
     const dur = 3.6, master = ac.createGain();
     master.gain.setValueAtTime(0, t + 0.05); master.gain.linearRampToValueAtTime(0.32, t + 0.45); master.gain.setValueAtTime(0.3, t + 1.5); master.gain.linearRampToValueAtTime(0, t + dur);

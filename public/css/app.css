@@ -365,7 +365,7 @@ body.open .rail{right:calc(var(--dw) + 20px)}
 .intro-ui{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:22px;padding:24px;text-align:center;color:#fff4e6;transition:opacity .45s ease,transform .6s ease;pointer-events:none}
 .intro-ui.away{opacity:0;transform:scale(1.08)}
 .i-kick{font-family:var(--mono);font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,236,214,.75)}
-.i-hello{margin:0;font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:clamp(48px,10vw,128px);line-height:.9;letter-spacing:.01em;text-shadow:0 2px 30px rgba(60,0,10,.45)}
+.i-hello{margin:0;font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:clamp(40px,7.4vw,104px);text-wrap:balance;line-height:.9;letter-spacing:.01em;text-shadow:0 2px 30px rgba(60,0,10,.45)}
 .i-bar{width:min(280px,64vw);display:grid;gap:9px}
 .i-track{height:2px;border-radius:2px;background:rgba(255,236,214,.22);overflow:hidden}
 .i-fill{height:100%;width:0;background:#fff4e6}
@@ -635,3 +635,13 @@ body.choosing .rail,body.choosing .hint{opacity:0;pointer-events:none}
 .pxi li::marker{color:var(--faint);font-family:var(--mono);font-size:11px}
 .pxi .role{font-family:var(--mono);font-size:10px;color:var(--fg-2);margin-left:4px}
 .pxi small{display:block;color:var(--fg-2);font-size:11.5px}
+.ch-next{display:block;margin-top:8px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--fg-2)}
+.ch-quick{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;margin-top:12px;padding:14px 16px;border:1px solid var(--line-2);border-radius:14px;background:rgba(255,255,255,.03)}
+.ch-quick:hover,.ch-quick:focus-visible{border-color:var(--fg-2);background:rgba(255,255,255,.06)}
+.ch-quick b{font-weight:600}
+.ch-quick #chMatch{color:var(--fg-2);font-size:12.5px;margin-left:6px}
+.ch-quick small{grid-column:1;color:var(--muted);font-size:12px}
+.ch-quick .ch-go{grid-row:1 / span 2;grid-column:2}
+.fan-verdict{display:grid;gap:2px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,153,51,.5);background:linear-gradient(90deg,rgba(255,153,51,.14),rgba(29,79,179,.14))}
+.fan-verdict b{font-family:var(--display);font-weight:900;font-size:18px;letter-spacing:.03em;text-transform:uppercase}
+.fan-verdict span{font-size:12.5px;color:var(--fg-2)}

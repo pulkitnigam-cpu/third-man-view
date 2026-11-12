@@ -24,7 +24,7 @@
   <div class="intro-ui" id="introUI">
     <div class="i-kick" id="iKick">Third Man View</div>
     <h1 class="i-hello" id="iHello">Welcome</h1>
-    <div class="i-bar"><div class="i-track"><div class="i-fill" id="iFill"></div></div><div class="i-status" id="iStatus" aria-live="polite">Checking today's fixtures</div></div>
+    <div class="i-bar"><div class="i-track"><div class="i-fill" id="iFill"></div></div><div class="i-status" id="iStatus" aria-live="polite">Opening the scorebook</div></div>
     <div class="i-tap" id="iTap">Tap to bowl <span aria-hidden="true">🔊</span></div>
   </div>
   <button class="i-skip" id="iSkip">Skip intro</button>
@@ -54,9 +54,9 @@
       <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="none"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
       <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" stroke="none"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
     </button>
-    <button class="cta-news" id="ctaNews" title="Writes the newsletter for India's next match and sends it to Telegram">
+    <button class="cta-news" id="ctaNews" title="Researches India's next match and sends the brief to Telegram">
       <span class="star" aria-hidden="true">✦</span>
-      <span class="cta-t"><b>Write tonight's newsletter</b><small id="ctaMatch">Finding India's next match…</small></span>
+      <span class="cta-t"><b>Research tonight's match</b><small id="ctaMatch">Finding India's next match…</small></span>
     </button>
   </div>
 </header>
@@ -78,26 +78,25 @@
 <div class="chooser" id="chooser" hidden>
   <div class="ch-in">
     <div class="ch-kick">Third Man View</div>
-    <h2>Where do you want to start?</h2>
-    <button class="ch-main" data-mode="newsletter">
-      <span class="ch-tag">Recommended</span>
-      <b>Write tonight's newsletter</b>
-      <span id="chMatch">India's next match</span>
-      <small>Squads, pitch, form, head-to-head and predicted XIs, written up and sent to your Telegram. About a minute.</small>
-      <i class="ch-go" aria-hidden="true">→</i>
-    </button>
+    <h2>Start your research</h2>
     <div class="ch-cards">
       <button class="ch-card" data-mode="upcoming">
         <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 24h34M24 7c6 6 6 28 0 34M24 7c-6 6-6 28 0 34" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-        <b>Explore upcoming matches</b>
-        <span>Fixtures on the globe, each with a full dossier.</span>
+        <b>An upcoming match</b>
+        <span>Head-to-head, venue and pitch, squads, form and the predicted XI.</span>
+        <span class="ch-next" id="chUpMatch">Fixtures on the globe, each with a full dossier.</span>
       </button>
       <button class="ch-card" data-mode="past">
         <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 24a14 14 0 1 0 4-9.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 10v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 16v9l6 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <b>Research past matches</b>
-        <span>Scorecards, match reports and reviews since 2001.</span>
+        <b>A past match</b>
+        <span>Scorecards, records, match reports and reviews since 2001.</span>
       </button>
     </div>
+    <button class="ch-quick" data-mode="newsletter">
+      <span><b>Quick research brief</b> <span id="chMatch">India's next match</span></span>
+      <small>One click: squads, pitch, form, head-to-head and predicted XIs, researched and sent to your Telegram.</small>
+      <i class="ch-go" aria-hidden="true">→</i>
+    </button>
   </div>
 </div>
 

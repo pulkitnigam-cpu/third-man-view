@@ -154,6 +154,7 @@ function pinLoop() {
 /* ---------- grounds: at least one per major cricket nation ---------- */
 const GROUND_NATIONS = { IND: ["IN"], AUS: ["AU"], ENG: ["GB"], NZ: ["NZ"], SA: ["ZA"], PAK: ["PK"], SL: ["LK"], BAN: ["BD"], WI: ["BB", "TT", "JM", "GY", "AG", "LC", "GD", "KN", "VC", "DM"], ZIM: ["ZW"], IRE: ["IE"], UAE: ["AE"], NED: ["NL"], SCO: ["GB"], NEP: ["NP"], NAM: ["NA"], OMA: ["OM"], USA: ["US"], CAN: ["CA"], PNG: ["PG"], HK: ["HK"] };
 const SCOTTISH = /^(Edinburgh|Aberdeen|Glasgow|Dundee|Ayr|Forfar|Arbroath|Perth \(Scotland\))$/;
+const ALWAYS_GROUNDS = [["green-park-kanpur", "IND"]];
 let grounds = [];
 function buildGrounds() {
   const total = (v) => Object.values(v.fmt).reduce((n, f) => n + f.p, 0);
@@ -163,6 +164,11 @@ function buildGrounds() {
     const list = Object.values(venues).filter((v) => ccs.includes(v.cc) && v.lat != null && !used.has(v.id) && (team === "SCO" ? SCOTTISH.test(v.city || "") : team === "ENG" ? !SCOTTISH.test(v.city || "") && !/Belfast|Bready|Stormont/.test(v.city || v.name) : true))
       .sort((a, b) => total(b) - total(a)).slice(0, TEAMS[team]?.major === false ? 1 : 2);
     for (const v of list) { used.add(v.id); grounds.push({ id: "g:" + v.id, ground: true, team, V: v, lat: v.lat, lng: v.lon, n: total(v) }); }
+  }
+  // grounds always shown on the map, whatever their match count
+  for (const [id, team] of ALWAYS_GROUNDS) {
+    const v = venues[id];
+    if (v?.lat != null && !used.has(id)) { used.add(id); grounds.push({ id: "g:" + id, ground: true, team, V: v, lat: v.lat, lng: v.lon, n: total(v) }); }
   }
 }
 function makeGroundPin(g) {
@@ -341,6 +347,7 @@ function labelCTA() {
   const m = nextToWrite();
   const when = m && new Date(m.start).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
   const label = m ? `${TEAMS[m.a]?.name || m.a} v ${TEAMS[m.b]?.name || m.b} · ${m.fmt} · ${when}` : "No live India fixture · search a match";
+  const up = $("#chUpMatch"); if (up) up.textContent = m ? `Next up: ${label}` : "Fixtures on the globe, each with a full dossier.";
   $("#ctaMatch").textContent = label;
   const ch = $("#chMatch"); if (ch) ch.textContent = m ? `${label}${m.V ? ` · ${m.V.name}` : ""}` : label;
 }
@@ -381,7 +388,7 @@ function openFromHash() {
 }
 
 /* ---------- boot: intro runs while data and the globe load ---------- */
-const USER_NAME = "Arjun";
+const USER_NAME = "Suresh Raina fan";
 const ready = Promise.all([getMeta(), getVenues(), getFixtures()]).then(([m, v, f]) => {
   meta = m; venues = v;
   fixtures = f.fixtures.map(withStatus);

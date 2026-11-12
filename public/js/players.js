@@ -3,6 +3,9 @@
 import { getJSON } from "./data.js";
 
 const FMTS = ["T20I", "ODI", "Test"];
+// House favourite: Suresh Raina (Cricsheet id) stays in India's list although retired, and gets a fan banner.
+// The banner is a joke on top of the real numbers; it never changes them.
+const RAINA = "1dc12ab9";
 const r1 = (x) => Math.round(x * 10) / 10;
 const sum = (a, b) => (a || 0) + (b || 0);
 const loadPlayers = (code) => getJSON(`data/players/${code}.json`).catch(() => ({ players: [] }));
@@ -57,7 +60,7 @@ export async function renderPlayersTab(body, S, d, h) {
     const built = new Date((S.meta?.built || new Date().toISOString().slice(0, 10)) + "T00:00:00Z");
     const cutoff = new Date(Date.UTC(built.getUTCFullYear(), built.getUTCMonth() - 18, built.getUTCDate())).toISOString().slice(0, 10);
     const inSquad = new Set([...(d.squadA || []), ...(d.squadB || [])].map((p) => p.id));
-    const current = (p) => inSquad.has(p.id) || (p.last || "") >= cutoff;
+    const current = (p) => p.id === RAINA || inSquad.has(p.id) || (p.last || "") >= cutoff;
     S.PL = { [A]: pa.players.filter(current).map((p) => ({ ...p, t: A, sq: inSquad.has(p.id) })), [B]: pb.players.filter(current).map((p) => ({ ...p, t: B, sq: inSquad.has(p.id) })) };
     if (S.tab !== "matchups") return;
   }
@@ -105,6 +108,7 @@ function view(S, d, h, L, R) {
   return `
   ${pickers}
   <div id="cmpTop"></div>
+  ${L.id === RAINA || R.id === RAINA ? `<div class="fan-verdict"><b>Fan verdict: Suresh Raina is the greatest.</b> <span>Mr IPL, the house favourite. Just for fun: the numbers below are the real ones.</span></div>` : ""}
   ${sec("Comparison", { aside: fmt === "All" ? "all formats" : fmt,
     body: `<div class="seg sm" role="group" aria-label="Format" style="width:max-content">${["T20I", "ODI", "Test", "All"].map((f) => `<button data-pf="${f}" aria-pressed="${fmt === f}" ${f === "All" || L.f[f] || R.f[f] ? "" : 'disabled style="opacity:.35"'}>${f === "All" ? "All formats" : f}</button>`).join("")}</div>
     <div class="pcards">${pcard(L, l, side(L), h, fmt)}${pcard(R, r, side(R), h, fmt)}</div>
@@ -121,7 +125,7 @@ function picker(S, h, slot, label, selId) {
   const fmts = (p) => FMTS.filter((f) => p.f[f]).map((f) => `${f} ${p.f[f].m}`).join(", ");
   // per team: this match's squad first (by role), then other current players
   const byRole = (ps) => ROLE_ORDER.flatMap((ro) => ps.filter((p) => p.role === ro).sort((x, y) => total(y) - total(x)));
-  const groups = [A, B].flatMap((t) => [[`${h.nm(t)} · Squad for this match`, byRole(S.PL[t].filter((p) => p.sq))], [`${h.nm(t)} · Other current players`, byRole(S.PL[t].filter((p) => !p.sq))]]).filter(([, ps]) => ps.length);
+  const groups = [A, B].flatMap((t) => [[`${h.nm(t)} · Squad for this match`, byRole(S.PL[t].filter((p) => p.sq))], [`${h.nm(t)} · Other current players`, byRole(S.PL[t].filter((p) => !p.sq && p.id !== RAINA))], [`${h.nm(t)} · Fan favourite`, S.PL[t].filter((p) => p.id === RAINA && !p.sq)]]).filter(([, ps]) => ps.length);
   const sel = [...S.PL[A], ...S.PL[B]].find((p) => p.id === selId);
   const RL = { BAT: "bat", WK: "wk", AR: "all-r", BOWL: "bowl" };
   return `<label class="pv-field" style="--tc:${h.col(sel?.t)}">
