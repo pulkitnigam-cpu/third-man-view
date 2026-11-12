@@ -1,8 +1,8 @@
 // Opening sequence, drawn on one canvas:
 // 1. the whole screen is a close-up of a red leather ball (with "Welcome" + a loading bar on top)
 // 2. once loaded, the red pulls back and turns out to be the ball, delivered down the pitch from the umpire's view
-// 3. a left-handed batter (India blue, No. 3) makes room and lofts it inside-out over extra cover for six;
-//    the ball sails over the camera, the crowd roars and flashes, and the app is revealed.
+// 3. a left-handed batter (India blue, No. 3) skips down the track and plays a classic lofted cover drive for six;
+//    the ball climbs away over cover, the crowd roars and flashes, and the app is revealed.
 
 const ease = { inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2), out: (t) => 1 - Math.pow(1 - t, 3), in: (t) => t * t * t };
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -10,20 +10,22 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 // Delivery timeline (seconds after the zoom-out starts)
 const T_ZOOM = 1.0;          // red close-up pulls back to the bowler's hand
-const T_PITCH = T_ZOOM + 0.85;
-const T_HIT = T_PITCH + 0.34; // bat meets ball
-const T_FLY = 1.1;           // seconds the ball is tracked after the hit, rising over the camera
-const T_END = T_HIT + 3.0;   // hold on the celebration, then reveal the app
+const T_PITCH = T_ZOOM + 0.95;
+const T_HIT = T_PITCH + 0.1;  // met on the half-volley, just after it pitches
+const T_FLY = 1.2;            // seconds the ball is tracked after the hit, climbing away over cover
+const T_END = T_HIT + 3.0;    // hold on the celebration, then reveal the app
 // ?introspeed=0.2 slows the sequence down (for checking frames)
 const SPEED = Math.min(4, Math.max(0.05, +new URLSearchParams(location.search).get("introspeed") || 1));
 
 // World (metres): camera is the umpire behind the bowler's stumps, looking down the pitch.
 const CAM_H = 1.65, STUMPS_Z = 21.6, BALL_R = 0.11; // ball drawn ~3x real size so it reads on screen
-const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [0.12, BALL_R, 15.6], P_HIT = [0.3, 0.74, 19.4];
-// the batter: feet on the popping crease, body on the leg side (camera left) of a left-hander's stumps
-const BAT_Z = STUMPS_Z - 1.1, BAT_X = -0.3;
-// after the hit: up, towards the camera and off to its right (extra cover), out of the top of the frame
-const flyPos = (u) => [P_HIT[0] + 3.4 * u, P_HIT[1] + 6.2 * u - 0.6 * u * u, P_HIT[2] - 9.5 * u];
+const P_RELEASE = [0.3, 2.0, 3.6], P_PITCH = [0.22, BALL_R, 17.7], P_HIT = [0.34, 0.42, 18.3];
+// the batter: takes guard on the popping crease, body on the leg side (camera left) of a left-hander's stumps,
+// then skips 1.4 m down the track to meet the ball on the half-volley
+const BAT_Z0 = STUMPS_Z - 1.1, BAT_Z1 = BAT_Z0 - 1.4, BAT_X0 = -0.26, BAT_X1 = -0.08;
+const T_STEP0 = T_ZOOM - 0.15, T_STEP1 = T_PITCH - 0.08; // the skip down the track
+// after the hit: lofted over cover, i.e. up and away to the off side (camera right), out of the top of the frame
+const flyPos = (u) => [P_HIT[0] + 7.5 * u, P_HIT[1] + 8.5 * u - 1.2 * u * u, P_HIT[2] - 6.5 * u];
 
 export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio, onDone }) {
   const root = document.getElementById("intro");
@@ -180,53 +182,75 @@ export function playIntro({ ready, name, greeting, short, reduceMotion, getAudio
     ctx.restore();
   }
 
-  // A left-handed batter seen from the bowler's end, in India blue. Pose keys run stance → backlift (stepping to
-  // leg to make room) → contact out in front → a high, open follow-through over extra cover.
+  // A left-handed batter seen from the bowler's end, in India blue (No. 3). He skips down the track as the ball is
+  // released, bat high, meets it on the half-volley with the front knee bent and a high elbow, and lofts it over
+  // cover with a full, high follow-through. Pose keys are interpolated between fixed moments of the delivery.
   function drawBatter(t) {
+    // th: bat angle from the hands (0 = straight down, +π/2 = towards cover, ±π = straight up); len: how much of the
+    // bat's length shows (it points at the camera mid-swing); hx/hy: hands; hip: hip height; fx/bx: front/back foot
     const keys = [
-      [0, { th: 0.25, hx: 0.12, hy: 0.92, sh: 0, fx: 0.16, lean: 0 }],
-      [T_PITCH - 0.32, { th: 0.25, hx: 0.12, hy: 0.92, sh: 0, fx: 0.16, lean: 0 }],
-      [T_HIT - 0.1, { th: -2.5, hx: -0.2, hy: 1.48, sh: -0.32, fx: 0.18, lean: -0.08 }],
-      [T_HIT, { th: 0.45, hx: 0.22, hy: 0.88, sh: -0.3, fx: 0.34, lean: 0.12 }],
-      [T_HIT + 0.32, { th: 2.6, hx: 0.42, hy: 1.8, sh: -0.3, fx: 0.34, lean: 0.04 }],
+      [0, { th: 0.25, len: 1, hx: 0.1, hy: 0.92, hip: 0.95, fx: 0.17, bx: -0.17, lean: 0 }],
+      [T_STEP0, { th: 0.25, len: 1, hx: 0.1, hy: 0.92, hip: 0.95, fx: 0.17, bx: -0.17, lean: 0 }],
+      [T_STEP1, { th: -2.75, len: 1, hx: -0.04, hy: 1.6, hip: 0.93, fx: 0.24, bx: -0.2, lean: -0.04 }],
+      [T_HIT - 0.06, { th: -0.7, len: 0.55, hx: 0.12, hy: 1.18, hip: 0.86, fx: 0.34, bx: -0.24, lean: 0.08 }],
+      [T_HIT, { th: 0.35, len: 1, hx: 0.3, hy: 0.98, hip: 0.82, fx: 0.38, bx: -0.25, lean: 0.14 }],
+      [T_HIT + 0.38, { th: 3.25, len: 1, hx: 0.3, hy: 2.0, hip: 0.9, fx: 0.38, bx: -0.22, lean: 0.06 }],
     ];
     let p = keys.at(-1)[1];
     for (let i = 0; i < keys.length - 1; i++) {
       const [ta, a] = keys[i], [tb, b] = keys[i + 1];
-      if (t >= ta && t < tb) { const u = (i === 2 ? ease.in : ease.inOut)(clamp((t - ta) / (tb - ta))); p = Object.fromEntries(Object.keys(a).map((k) => [k, lerp(a[k], b[k], u)])); break; }
+      if (t >= ta && t < tb) {
+        const fn = i === 2 ? ease.in : i === 4 ? ease.out : i === 3 ? (x) => x : ease.inOut;
+        const u = fn(clamp((t - ta) / (tb - ta)));
+        p = Object.fromEntries(Object.keys(a).map((k) => [k, lerp(a[k], b[k], u)]));
+        break;
+      }
     }
-    const [x0, y0] = proj(BAT_X + p.sh, 0, BAT_Z), s = scene.f / BAT_Z;
+    // down the track: body moves forward (towards the camera) and a touch towards the line of the ball
+    const step = ease.inOut(clamp((t - T_STEP0) / (T_STEP1 - T_STEP0)));
+    const bz = lerp(BAT_Z0, BAT_Z1, step), bxw = lerp(BAT_X0, BAT_X1, step);
+    // two quick skips: front foot leads, back foot follows; the hips bob with each
+    const ph = clamp((t - T_STEP0) / (T_STEP1 - T_STEP0));
+    const skip = (a, b) => (ph > a && ph < b ? Math.sin(((ph - a) / (b - a)) * Math.PI) : 0);
+    const liftF = 0.12 * (skip(0, 0.4) + skip(0.5, 0.85)), liftB = 0.1 * (skip(0.25, 0.6) + skip(0.7, 0.98));
+    const hip = p.hip + 0.04 * (skip(0, 0.5) + skip(0.5, 1));
+
+    const [x0, y0] = proj(bxw, 0, bz), s = scene.f / bz;
     const X = (x) => x0 + x * s, Y = (y) => y0 - y * s;
     const seg = (x1, y1, x2, y2, w, col) => { ctx.strokeStyle = col; ctx.lineWidth = w * s; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(X(x1), Y(y1)); ctx.lineTo(X(x2), Y(y2)); ctx.stroke(); };
+    const leg = (hx, fx, lift, kneeOut, trouser) => {
+      const kx = lerp(hx, fx, 0.55) + kneeOut, ky = lerp(hip, lift, 0.5) + 0.02;
+      seg(hx, hip, kx, ky, 0.15, trouser);         // thigh
+      seg(kx, ky + 0.06, fx, lift + 0.06, 0.19, PAD); // pad from just above the knee
+      seg(fx - 0.03, lift + 0.03, fx + 0.1, lift + 0.02, 0.1, "#e8e4da"); // shoe
+    };
     const BLUE = "#1d4fb3", DEEP = "#123577", PAD = "#f3f1ea", SAFFRON = "#ff8a1f";
+    const font = getComputedStyle(document.documentElement).getPropertyValue("--display") || "Impact";
     // shadow
-    ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(X(0.05), Y(0), 0.42 * s, 0.07 * s, 0, 0, 7); ctx.fill();
-    const hip = 0.95, sho = 1.44, lean = p.lean;
-    // back leg (camera left) and front leg striding towards off side (camera right), trousers then pads
-    seg(-0.08 + lean * 0.5, hip, -0.2, 0.06, 0.15, DEEP); seg(-0.17, 0.52, -0.2, 0.05, 0.19, PAD);
-    seg(0.08 + lean * 0.5, hip, p.fx, 0.06, 0.15, BLUE); seg(p.fx * 0.85, 0.52, p.fx, 0.05, 0.19, PAD);
-    seg(-0.22, 0.03, -0.12, 0.02, 0.1, "#e8e4da"); seg(p.fx - 0.02, 0.03, p.fx + 0.1, 0.02, 0.1, "#e8e4da"); // shoes
-    // torso with saffron trim and the No. 3
-    const tx = lean * 0.5;
+    ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(X(0.05), Y(0), 0.44 * s, 0.07 * s, 0, 0, 7); ctx.fill();
+    const lean = p.lean, sho = hip + 0.5, tx = lean * 0.5;
+    // back leg (camera left), then the body, then the front leg bending towards the ball (camera right)
+    leg(-0.07 + tx, p.bx, liftB, -0.02, DEEP);
     ctx.fillStyle = BLUE; ctx.beginPath();
-    ctx.moveTo(X(tx - 0.16), Y(hip)); ctx.lineTo(X(tx + 0.16), Y(hip)); ctx.lineTo(X(lean + 0.19), Y(sho)); ctx.lineTo(X(lean - 0.19), Y(sho)); ctx.closePath(); ctx.fill();
-    seg(lean - 0.18, sho - 0.02, lean + 0.18, sho - 0.02, 0.035, SAFFRON);
-    ctx.fillStyle = "#fff"; ctx.font = `800 ${0.15 * s}px ${getComputedStyle(document.documentElement).getPropertyValue("--display") || "Impact"}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.moveTo(X(tx - 0.14), Y(hip)); ctx.lineTo(X(tx + 0.14), Y(hip)); ctx.lineTo(X(lean + 0.16), Y(sho)); ctx.lineTo(X(lean - 0.16), Y(sho)); ctx.closePath(); ctx.fill();
+    seg(lean - 0.15, sho - 0.02, lean + 0.15, sho - 0.02, 0.035, SAFFRON);
+    ctx.fillStyle = "#fff"; ctx.font = `800 ${0.14 * s}px ${font}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("3", X(tx + lean * 0.5), Y((hip + sho) / 2));
-    // back arm, bat, front arm, gloves
-    const shL = [lean - 0.17, sho - 0.04], shR = [lean + 0.17, sho - 0.04];
-    seg(shL[0], shL[1], p.hx - 0.03, p.hy, 0.085, DEEP);
-    const dx = Math.sin(p.th), dy = -Math.cos(p.th); // screen direction of the bat from the hands (y up in metres)
-    const hx = p.hx, hy = p.hy;
-    seg(hx, hy, hx + dx * 0.28, hy + dy * 0.28, 0.045, "#2b2b2b"); // handle grip
-    seg(hx + dx * 0.28, hy + dy * 0.28, hx + dx * 0.86, hy + dy * 0.86, 0.11, "#e8cf96"); // blade
-    seg(hx + dx * 0.3, hy + dy * 0.3, hx + dx * 0.84, hy + dy * 0.84, 0.03, "#c9a865"); // edge shading
-    seg(shR[0], shR[1], p.hx + 0.03, p.hy, 0.085, BLUE);
+    leg(0.07 + tx, p.fx, liftF, Math.max(0, 0.95 - hip) * 1.4, BLUE);
+    // back arm, bat, front arm (high elbow), gloves
+    const shB = [lean - 0.15, sho - 0.04], shF = [lean + 0.15, sho - 0.04];
+    seg(shB[0], shB[1], p.hx - 0.03, p.hy, 0.08, DEEP);
+    const L = 0.86 * p.len, dx = Math.sin(p.th), dy = -Math.cos(p.th), hx = p.hx, hy = p.hy;
+    seg(hx, hy, hx + dx * 0.28 * p.len, hy + dy * 0.28 * p.len, 0.045, "#2b2b2b"); // grip
+    seg(hx + dx * 0.28 * p.len, hy + dy * 0.28 * p.len, hx + dx * L, hy + dy * L, 0.11, "#e8cf96"); // blade
+    seg(hx + dx * 0.3 * p.len, hy + dy * 0.3 * p.len, hx + dx * (L - 0.02), hy + dy * (L - 0.02), 0.03, "#c9a865"); // edge
+    const elbow = [lerp(shF[0], hx, 0.5) + 0.06, lerp(shF[1], hy, 0.5) + 0.05];
+    seg(shF[0], shF[1], elbow[0], elbow[1], 0.08, BLUE); seg(elbow[0], elbow[1], hx + 0.03, hy, 0.075, BLUE);
     ctx.fillStyle = PAD; ctx.beginPath(); ctx.arc(X(hx), Y(hy), 0.06 * s, 0, 7); ctx.fill();
-    // helmet with grille, looking down the pitch
-    const hdx = lean, hdy = sho + 0.17;
+    // helmet with grille, eyes on the ball
+    const hdx = lean + 0.02, hdy = sho + 0.17;
     ctx.fillStyle = "#0f1d47"; ctx.beginPath(); ctx.arc(X(hdx), Y(hdy), 0.12 * s, Math.PI, 0); ctx.lineTo(X(hdx + 0.12), Y(hdy - 0.02)); ctx.lineTo(X(hdx - 0.12), Y(hdy - 0.02)); ctx.fill();
-    seg(hdx - 0.13, hdy - 0.01, hdx + 0.15, hdy - 0.01, 0.03, "#0f1d47"); // peak
+    seg(hdx - 0.13, hdy - 0.01, hdx + 0.15, hdy - 0.01, 0.03, "#0f1d47");
     ctx.strokeStyle = "rgba(210,215,225,.85)"; ctx.lineWidth = Math.max(1, 0.012 * s);
     for (const gy of [0.04, 0.08, 0.12]) { ctx.beginPath(); ctx.moveTo(X(hdx - 0.09), Y(hdy - gy)); ctx.lineTo(X(hdx + 0.09), Y(hdy - gy)); ctx.stroke(); }
   }
